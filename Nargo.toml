@@ -1,0 +1,8 @@
+[package]
+name = "noir_bn254_pairing"
+type = "lib"
+authors = [""]
+compiler_version = ">=0.33.0"
+
+[dependencies]
+bignum = {tag = "v0.8.3", git = "https://github.com/noir-lang/noir-bignum"}
