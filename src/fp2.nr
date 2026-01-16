@@ -29,8 +29,8 @@ pub fn non_residue_inv() -> Fp2 {
 
 pub fn b_twist() -> Fp2 {
     Fp2 {
-        c0: Fp::from_limbs([0x4fa084e52d1852e4a2bd0685c315d2, 0x13b03af0fed4cd2cafadeed8fdf4a7, 0x97]),
-        c1: Fp::from_limbs([0xb4c5e559dbefa33267e6dc24a138e5, 0x9d40ceb8aaae81be18991be06ac3b5, 0x2b14]),
+        c0: Fp::from_limbs([0xb4c5e559dbefa33267e6dc24a138e5, 0x9d40ceb8aaae81be18991be06ac3b5, 0x2b14]),
+        c1: Fp::from_limbs([0x4fa084e52d1852e4a2bd0685c315d2, 0x13b03af0fed4cd2cafadeed8fdf4a7, 0x97]),
     }
 }
 
