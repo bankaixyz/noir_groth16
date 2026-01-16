@@ -1,0 +1,10 @@
+[package]
+name = "sp1_verify_example"
+type = "bin"
+authors = [""]
+compiler_version = ">=0.33.0"
+
+[dependencies]
+noir_groth16_verify = { path = "../groth16_verify", package = "noir_groth16_verify" }
+noir_bn254_pairing = { path = "../bn254_pairing", package = "noir_bn254_pairing" }
+bignum = {tag = "v0.8.3", git = "https://github.com/noir-lang/noir-bignum"}
