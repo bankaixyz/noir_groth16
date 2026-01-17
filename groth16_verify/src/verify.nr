@@ -6,6 +6,7 @@ use noir_bn254_pairing::g1::{
     G1Affine,
     G1Jac,
     add_g1_jac,
+    add_g1_jac_mixed,
     double_g1_jac,
     g1_affine_infinity,
     g1_jacobian_infinity,
@@ -75,7 +76,7 @@ fn msm2_window3_g1_jac(
     let b1 = b_bits[253];
     let b2: u1 = 0;
     let add_aff = select_g1_affine_by_u6(table, [a0, a1, a2, b0, b1, b2]);
-    acc = add_g1_jac(acc, g1_affine_to_jac(add_aff));
+    acc = add_g1_jac_mixed(acc, add_aff);
 
     for w in 0..84 {
         let ww = 83 - w;
@@ -92,7 +93,7 @@ fn msm2_window3_g1_jac(
         let b2 = b_bits[base + 2];
 
         let add_aff = select_g1_affine_by_u6(table, [a0, a1, a2, b0, b1, b2]);
-        acc = add_g1_jac(acc, g1_affine_to_jac(add_aff));
+        acc = add_g1_jac_mixed(acc, add_aff);
     }
 
     acc
@@ -161,7 +162,7 @@ pub fn verify_sp1_fast(
     msm2_w3_table: [G1Affine; 64],
 ) -> bool {
     let msm = msm2_window3_g1_jac(msm2_w3_table, public_inputs[0], public_inputs[1]);
-    let acc = add_g1_jac(g1_affine_to_jac(vk.ic[0]), msm);
+    let acc = add_g1_jac_mixed(msm, vk.ic[0]);
     let l = jacobian_to_affine_g1(acc);
 
     let result = pairing_multi(

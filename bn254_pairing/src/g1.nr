@@ -131,6 +131,42 @@ pub fn add_g1_jac(p: G1Jac, q: G1Jac) -> G1Jac {
     }
 }
 
+pub fn add_g1_jac_mixed(p: G1Jac, q: G1Affine) -> G1Jac {
+    if p.is_infinity() {
+        if q.is_infinity() {
+            g1_jacobian_infinity()
+        } else {
+            G1Jac { x: q.x, y: q.y, z: fp_one() }
+        }
+    } else if q.is_infinity() {
+        p
+    } else {
+        let z2z2 = p.z * p.z;
+        let u1 = q.x * z2z2;
+        let s1 = q.y * p.z * z2z2;
+        let u2 = p.x;
+        let s2 = p.y;
+        let same_u = u1 == u2;
+        let same_s = s1 == s2;
+
+        if same_u & same_s {
+            double_g1_jac(p)
+        } else {
+            let h = u2 - u1;
+            let i = fp_two() * h;
+            let i = i * i;
+            let j = h * i;
+            let r = fp_two() * (s2 - s1);
+            let v = u1 * i;
+
+            let x3 = r * r - j - fp_two() * v;
+            let y3 = r * (v - x3) - fp_two() * s1 * j;
+            let z3 = ((p.z + h) * (p.z + h) - z2z2 - h * h);
+            G1Jac { x: x3, y: y3, z: z3 }
+        }
+    }
+}
+
 pub fn double_g1_jac(p: G1Jac) -> G1Jac {
     let a = p.x * p.x;
     let b = p.y * p.y;
