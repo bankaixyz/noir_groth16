@@ -744,3 +744,44 @@ template FpDiv() {
         out[j] <== mul.out[j];
     }
 }
+
+template FpEq() {
+    signal input a[3];
+    signal input b[3];
+    signal output out;
+
+    component eq0 = IsEqual();
+    component eq1 = IsEqual();
+    component eq2 = IsEqual();
+    eq0.a <== a[0];
+    eq0.b <== b[0];
+    eq1.a <== a[1];
+    eq1.b <== b[1];
+    eq2.a <== a[2];
+    eq2.b <== b[2];
+
+    signal tmp;
+    tmp <== eq0.out * eq1.out;
+    out <== tmp * eq2.out;
+    out * (out - 1) === 0;
+}
+
+template FpIsZero() {
+    signal input a[3];
+    signal output out;
+
+    component eq0 = IsEqual();
+    component eq1 = IsEqual();
+    component eq2 = IsEqual();
+    eq0.a <== a[0];
+    eq0.b <== 0;
+    eq1.a <== a[1];
+    eq1.b <== 0;
+    eq2.a <== a[2];
+    eq2.b <== 0;
+
+    signal tmp;
+    tmp <== eq0.out * eq1.out;
+    out <== tmp * eq2.out;
+    out * (out - 1) === 0;
+}
