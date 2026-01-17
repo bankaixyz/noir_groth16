@@ -1,18 +1,18 @@
 const path = require("path");
 const wasm_tester = require("circom_tester").wasm;
 const { expect } = require("chai");
-const { bigIntToLimbs, limbsToBigInt, mod, fp2Inv } = require("./field");
+const { limbsToBigInt, mod, fp2Inv } = require("./field");
 
-const fp = (arr) => arr.map((v) => BigInt(v));
+const fp = (arr) => limbsToBigInt(arr.map((v) => BigInt(v)));
 const fp2 = (a0, a1) => [fp(a0), fp(a1)];
 const fp6 = (b0, b1, b2) => [b0, b1, b2];
-const fpNeg = (value) => bigIntToLimbs(mod(-limbsToBigInt(value)));
+const fpNeg = (value) => mod(-value);
 const fp2Neg = (value) => [fpNeg(value[0]), fpNeg(value[1])];
 const fp6Neg = (value) => [fp2Neg(value[0]), fp2Neg(value[1]), fp2Neg(value[2])];
 
-const fpZero = fp(["0x0", "0x0", "0x0"]);
-const fp2Zero = fp2(["0x0", "0x0", "0x0"], ["0x0", "0x0", "0x0"]);
-const fp2One = fp2(["0x1", "0x0", "0x0"], ["0x0", "0x0", "0x0"]);
+const fpZero = 0n;
+const fp2Zero = [0n, 0n];
+const fp2One = [1n, 0n];
 const fp6One = fp6(fp2One, fp2Zero, fp2Zero);
 
 const fixtureA = fp6(
@@ -235,8 +235,8 @@ describe("Fp6 operations", function () {
 
     it("square equals mul(a, a)", async function () {
         const outputs = await circuit.getOutput(witnessAA, {
-            mul: [3, [2, [3, 1]]],
-            square: [3, [2, [3, 1]]],
+            mul: [3, [2, 1]],
+            square: [3, [2, 1]],
         });
         expect(outputs.mul).to.deep.equal(outputs.square);
     });
@@ -268,8 +268,8 @@ describe("Fp6 operations", function () {
 
     it("mul_by_1 matches sparse mul", async function () {
         const outputs = await circuit.getOutput(witnessAB, {
-            mul_by_1: [3, [2, [3, 1]]],
-            mul_sparse: [3, [2, [3, 1]]],
+            mul_by_1: [3, [2, 1]],
+            mul_sparse: [3, [2, 1]],
         });
         expect(outputs.mul_by_1).to.deep.equal(outputs.mul_sparse);
     });

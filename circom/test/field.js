@@ -40,8 +40,8 @@ const fpSub = (a, b) => mod(a - b);
 const fpMul = (a, b) => mod(a * b);
 const fpNeg = (a) => mod(-a);
 
-const fp2ToBigInts = (fp2) => [limbsToBigInt(fp2[0]), limbsToBigInt(fp2[1])];
-const fp2FromBigInts = (fp2) => [bigIntToLimbs(fp2[0]), bigIntToLimbs(fp2[1])];
+const fp2ToBigInts = (fp2) => [BigInt(fp2[0]), BigInt(fp2[1])];
+const fp2FromBigInts = (fp2) => [mod(fp2[0]), mod(fp2[1])];
 const fp2AddBI = (a, b) => [fpAdd(a[0], b[0]), fpAdd(a[1], b[1])];
 const fp2SubBI = (a, b) => [fpSub(a[0], b[0]), fpSub(a[1], b[1])];
 const fp2NegBI = (a) => [fpNeg(a[0]), fpNeg(a[1])];
@@ -67,25 +67,18 @@ const fp2InvBI = (a) => {
     return [fpMul(a[0], t1), fpNeg(fpMul(a[1], t1))];
 };
 
-const fp2Add = (a, b) => fp2FromBigInts(fp2AddBI(fp2ToBigInts(a), fp2ToBigInts(b)));
-const fp2Sub = (a, b) => fp2FromBigInts(fp2SubBI(fp2ToBigInts(a), fp2ToBigInts(b)));
-const fp2Neg = (a) => fp2FromBigInts(fp2NegBI(fp2ToBigInts(a)));
-const fp2Mul = (a, b) => fp2FromBigInts(fp2MulBI(fp2ToBigInts(a), fp2ToBigInts(b)));
-const fp2MulByNonResidue = (a) =>
-    fp2FromBigInts(fp2MulByNonResidueBI(fp2ToBigInts(a)));
-const fp2Square = (a) => fp2FromBigInts(fp2SquareBI(fp2ToBigInts(a)));
-const fp2Double = (a) => fp2FromBigInts(fp2DoubleBI(fp2ToBigInts(a)));
-const fp2MulByElement = (a, elem) => fp2FromBigInts(fp2MulByElementBI(fp2ToBigInts(a), elem));
+const fp2Add = (a, b) => fp2FromBigInts(fp2AddBI(a, b));
+const fp2Sub = (a, b) => fp2FromBigInts(fp2SubBI(a, b));
+const fp2Neg = (a) => fp2FromBigInts(fp2NegBI(a));
+const fp2Mul = (a, b) => fp2FromBigInts(fp2MulBI(a, b));
+const fp2MulByNonResidue = (a) => fp2FromBigInts(fp2MulByNonResidueBI(a));
+const fp2Square = (a) => fp2FromBigInts(fp2SquareBI(a));
+const fp2Double = (a) => fp2FromBigInts(fp2DoubleBI(a));
+const fp2MulByElement = (a, elem) => fp2FromBigInts(fp2MulByElementBI(a, elem));
 
-const fp2Inv = (fp2) => {
-    return fp2FromBigInts(fp2InvBI(fp2ToBigInts(fp2)));
-};
+const fp2Inv = (fp2) => fp2FromBigInts(fp2InvBI(fp2));
 
-const fp6ToBigInts = (fp6) => [
-    fp2ToBigInts(fp6[0]),
-    fp2ToBigInts(fp6[1]),
-    fp2ToBigInts(fp6[2]),
-];
+const fp6ToBigInts = (fp6) => [fp6[0], fp6[1], fp6[2]];
 const fp6FromBigInts = (fp6) => [
     fp2FromBigInts(fp6[0]),
     fp2FromBigInts(fp6[1]),
@@ -164,14 +157,14 @@ const fp6InvBI = (a) => {
     ];
 };
 
-const fp6Add = (a, b) => fp6FromBigInts(fp6AddBI(fp6ToBigInts(a), fp6ToBigInts(b)));
-const fp6Sub = (a, b) => fp6FromBigInts(fp6SubBI(fp6ToBigInts(a), fp6ToBigInts(b)));
-const fp6Neg = (a) => fp6FromBigInts(fp6NegBI(fp6ToBigInts(a)));
-const fp6Mul = (a, b) => fp6FromBigInts(fp6MulBI(fp6ToBigInts(a), fp6ToBigInts(b)));
-const fp6Square = (a) => fp6FromBigInts(fp6SquareBI(fp6ToBigInts(a)));
-const fp6Inv = (a) => fp6FromBigInts(fp6InvBI(fp6ToBigInts(a)));
+const fp6Add = (a, b) => fp6FromBigInts(fp6AddBI(a, b));
+const fp6Sub = (a, b) => fp6FromBigInts(fp6SubBI(a, b));
+const fp6Neg = (a) => fp6FromBigInts(fp6NegBI(a));
+const fp6Mul = (a, b) => fp6FromBigInts(fp6MulBI(a, b));
+const fp6Square = (a) => fp6FromBigInts(fp6SquareBI(a));
+const fp6Inv = (a) => fp6FromBigInts(fp6InvBI(a));
 
-const fp12ToBigInts = (fp12) => [fp6ToBigInts(fp12[0]), fp6ToBigInts(fp12[1])];
+const fp12ToBigInts = (fp12) => [fp12[0], fp12[1]];
 const fp12FromBigInts = (fp12) => [fp6FromBigInts(fp12[0]), fp6FromBigInts(fp12[1])];
 const fp12MulBI = (a, b) => {
     const aSum = fp6AddBI(a[0], a[1]);
@@ -198,7 +191,7 @@ const fp12InvBI = (a) => {
     const c1 = fp6NegBI(fp6MulBI(a[1], t1b));
     return [c0, c1];
 };
-const fp12Inv = (a) => fp12FromBigInts(fp12InvBI(fp12ToBigInts(a)));
+const fp12Inv = (a) => fp12FromBigInts(fp12InvBI(a));
 
 module.exports = {
     MODULUS,

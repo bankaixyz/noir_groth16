@@ -1,8 +1,9 @@
 const path = require("path");
 const wasm_tester = require("circom_tester").wasm;
 const { expect } = require("chai");
+const { limbsToBigInt } = require("./field");
 
-const fp = (arr) => arr.map((v) => BigInt(v));
+const fp = (arr) => limbsToBigInt(arr.map((v) => BigInt(v)));
 const fp2 = (a0, a1) => [fp(a0), fp(a1)];
 const fp6 = (b0, b1, b2) => [b0, b1, b2];
 const fp12 = (c0, c1) => [c0, c1];
@@ -557,8 +558,8 @@ describe("Fp12 operations", function () {
 
     it("square equals mul(a, a)", async function () {
         const outputs = await circuit.getOutput(witnessAA, {
-            mul: [2, [3, [2, [3, 1]]]],
-            square: [2, [3, [2, [3, 1]]]],
+            mul: [2, [3, [2, 1]]],
+            square: [2, [3, [2, 1]]],
         });
         expect(outputs.mul).to.deep.equal(outputs.square);
     });
@@ -566,7 +567,7 @@ describe("Fp12 operations", function () {
     it("conjugate properties match", async function () {
         await circuit.assertOut(witnessAB, { conjugate: fixtureAConjugate });
         const outputs = await circuit.getOutput(witnessConj, {
-            add: [2, [3, [2, [3, 1]]]],
+            add: [2, [3, [2, 1]]],
         });
         expect(outputs.add[1]).to.deep.equal(fp6Zero);
     });

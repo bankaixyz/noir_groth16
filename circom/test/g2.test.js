@@ -9,9 +9,10 @@ const {
     fp2MulBI,
     fp2SquareBI,
     fp2InvBI,
+    limbsToBigInt,
 } = require("./field");
 
-const fp = (arr) => arr.map((v) => BigInt(v));
+const fp = (arr) => limbsToBigInt(arr.map((v) => BigInt(v)));
 const fp2 = (a0, a1) => [fp(a0), fp(a1)];
 const g2 = (x0, x1, y0, y1) => [fp2(x0, x1), fp2(y0, y1)];
 
@@ -143,12 +144,12 @@ describe("G2 operations", function () {
 
     it("matches affine arithmetic fixtures via jacobian", async function () {
         const outputs = await circuit.getOutput(witness, {
-            jac_sum: [3, [2, [3, 1]]],
-            jac_sum_inf1: [3, [2, [3, 1]]],
-            jac_sum_inf2: [3, [2, [3, 1]]],
-            jac_sum_neg: [3, [2, [3, 1]]],
-            jac_dbl: [3, [2, [3, 1]]],
-            jac_add_self: [3, [2, [3, 1]]],
+            jac_sum: [3, [2, 1]],
+            jac_sum_inf1: [3, [2, 1]],
+            jac_sum_inf2: [3, [2, 1]],
+            jac_sum_neg: [3, [2, 1]],
+            jac_dbl: [3, [2, 1]],
+            jac_add_self: [3, [2, 1]],
         });
 
         expect(jacobianToAffine(outputs.jac_sum)).to.deep.equal(pointAPlusB);
@@ -161,13 +162,13 @@ describe("G2 operations", function () {
 
     it("matches jacobian arithmetic expectations", async function () {
         const outputs = await circuit.getOutput(witness, {
-            jac_sum_pq: [3, [2, [3, 1]]],
-            jac_dbl_q: [3, [2, [3, 1]]],
-            jac_sum_neg_q: [3, [2, [3, 1]]],
-            jac_add_inf_q1: [3, [2, [3, 1]]],
-            jac_add_inf_q2: [3, [2, [3, 1]]],
-            jac_fuzzed_affine: [2, [2, [3, 1]]],
-            jac_inf_affine: [2, [2, [3, 1]]],
+            jac_sum_pq: [3, [2, 1]],
+            jac_dbl_q: [3, [2, 1]],
+            jac_sum_neg_q: [3, [2, 1]],
+            jac_add_inf_q1: [3, [2, 1]],
+            jac_add_inf_q2: [3, [2, 1]],
+            jac_fuzzed_affine: [2, [2, 1]],
+            jac_inf_affine: [2, [2, 1]],
         });
 
         const sumAff = jacobianToAffine(outputs.jac_sum_pq);

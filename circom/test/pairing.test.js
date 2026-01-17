@@ -2,9 +2,9 @@ const path = require("path");
 const wasm_tester = require("circom_tester").wasm;
 const { expect } = require("chai");
 
-const { fp12Inv } = require("./field");
+const { fp12Inv, limbsToBigInt } = require("./field");
 
-const fp = (arr) => arr.map((v) => BigInt(v));
+const fp = (arr) => limbsToBigInt(arr.map((v) => BigInt(v)));
 const fp2 = (a0, a1) => [fp(a0), fp(a1)];
 const fp6 = (b0, b1, b2) => [b0, b1, b2];
 const fp12 = (c0, c1) => [c0, c1];

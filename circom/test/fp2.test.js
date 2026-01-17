@@ -1,16 +1,15 @@
 const path = require("path");
 const wasm_tester = require("circom_tester").wasm;
 const { expect } = require("chai");
-const { bigIntToLimbs, fpInv, limbsToBigInt, mod } = require("./field");
+const { fpInv, limbsToBigInt, mod } = require("./field");
 
-const fp = (arr) => arr.map((v) => BigInt(v));
+const fp = (arr) => limbsToBigInt(arr.map((v) => BigInt(v)));
 const fp2 = (a0, a1) => [fp(a0), fp(a1)];
-const fpInvLimbs = (value) => bigIntToLimbs(fpInv(limbsToBigInt(value)));
-const fpNeg = (value) => bigIntToLimbs(mod(-limbsToBigInt(value)));
+const fpNeg = (value) => mod(-value);
 const fp2Neg = (value) => [fpNeg(value[0]), fpNeg(value[1])];
 
-const fpZero = fp(["0x0", "0x0", "0x0"]);
-const fp2One = fp2(["0x1", "0x0", "0x0"], ["0x0", "0x0", "0x0"]);
+const fpZero = 0n;
+const fp2One = [1n, 0n];
 
 const fixtureA = fp2(
     ["0x8fb963ec9acdeb921e94bec973154e", "0xb05e7ef12a97ed0b7deacb789da82e", "0x1672"],
@@ -73,7 +72,7 @@ describe("Fp2 operations", function () {
             a: fixtureA,
             b: fixtureB,
             inv: fixtureAInverse,
-            inv_elem_hint: fpInvLimbs(fixtureA[0]),
+            inv_elem_hint: fpInv(fixtureA[0]),
         };
         witnessAB = await circuit.calculateWitness(inputAB, true);
 
@@ -81,7 +80,7 @@ describe("Fp2 operations", function () {
             a: fixtureA,
             b: fixtureA,
             inv: fixtureAInverse,
-            inv_elem_hint: fpInvLimbs(fixtureA[0]),
+            inv_elem_hint: fpInv(fixtureA[0]),
         };
         witnessAA = await circuit.calculateWitness(inputAA, true);
 
@@ -89,7 +88,7 @@ describe("Fp2 operations", function () {
             a: fixtureANegated,
             b: fixtureB,
             inv: fixtureANegInverse,
-            inv_elem_hint: fpInvLimbs(fixtureANegated[0]),
+            inv_elem_hint: fpInv(fixtureANegated[0]),
         };
         witnessNeg = await circuit.calculateWitness(inputNeg, true);
     });
@@ -108,8 +107,8 @@ describe("Fp2 operations", function () {
 
     it("square equals mul(a, a)", async function () {
         const outputs = await circuit.getOutput(witnessAA, {
-            mul: [2, [3, 1]],
-            square: [2, [3, 1]],
+            mul: [2, 1],
+            square: [2, 1],
         });
         expect(outputs.mul).to.deep.equal(outputs.square);
     });
@@ -138,8 +137,8 @@ describe("Fp2 operations", function () {
     it("conjugate properties match", async function () {
         await circuit.assertOut(witnessAB, { conjugate: fixtureAConjugate });
         const outputs = await circuit.getOutput(witnessAB, {
-            sum_conj: [2, [3, 1]],
-            diff_conj: [2, [3, 1]],
+            sum_conj: [2, 1],
+            diff_conj: [2, 1],
         });
         expect(outputs.sum_conj[1]).to.deep.equal(fpZero);
         expect(outputs.diff_conj[0]).to.deep.equal(fpZero);
