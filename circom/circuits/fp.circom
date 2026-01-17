@@ -331,57 +331,305 @@ template FpMul() {
         bCheck.in[i] <== b[i];
     }
 
-    component b0Bits = Num2Bits(120);
-    component b1Bits = Num2Bits(120);
-    component b2Bits = Num2Bits(14);
-    b0Bits.in <== b[0];
-    b1Bits.in <== b[1];
-    b2Bits.in <== b[2];
+    var base = 1 << 120;
+    var mod0 = 0x816a916871ca8d3c208c16d87cfd47;
+    var mod1 = 0x4e72e131a029b85045b68181585d97;
+    var mod2 = 0x3064;
+    var mu0 = 0x65e1767cd4c086f3aed8a19bf90e51;
+    var mu1 = 0x462623a04a7ab074a5868073013ae9;
+    var mu2 = 0x54a47;
+    var mask32 = (1 << 32) - 1;
 
-    signal acc[255][3];
-    signal tmp[255][3];
-    component add[254];
-    component sel[254];
-    component dbl[254];
-    acc[0][0] <== 0;
-    acc[0][1] <== 0;
-    acc[0][2] <== 0;
-    for (var j = 0; j < 3; j++) {
-        tmp[0][j] <== a[j];
-    }
+    signal t0;
+    signal c0;
+    signal p0;
+    t0 <== a[0] * b[0];
+    c0 <-- t0 >> 120;
+    p0 <== t0 - c0 * base;
+    component p0Bits = Num2Bits(120);
+    p0Bits.in <== p0;
 
-    for (var i2 = 0; i2 < 254; i2++) {
-        add[i2] = FpAdd();
-        sel[i2] = FpSelect();
-        dbl[i2] = FpDouble();
-        for (var j2 = 0; j2 < 3; j2++) {
-            add[i2].a[j2] <== acc[i2][j2];
-            add[i2].b[j2] <== tmp[i2][j2];
-            sel[i2].b[j2] <== acc[i2][j2];
-            dbl[i2].a[j2] <== tmp[i2][j2];
-        }
+    signal t1;
+    signal c1;
+    signal p1;
+    t1 <== a[0] * b[1] + a[1] * b[0] + c0;
+    c1 <-- t1 >> 120;
+    p1 <== t1 - c1 * base;
+    component p1Bits = Num2Bits(120);
+    p1Bits.in <== p1;
 
-        for (var j3 = 0; j3 < 3; j3++) {
-            sel[i2].a[j3] <== add[i2].out[j3];
-        }
+    signal t2;
+    signal c2;
+    signal p2;
+    t2 <== a[0] * b[2] + a[1] * b[1] + a[2] * b[0] + c1;
+    c2 <-- t2 >> 120;
+    p2 <== t2 - c2 * base;
+    component p2Bits = Num2Bits(120);
+    p2Bits.in <== p2;
 
-        if (i2 < 120) {
-            sel[i2].sel <== b0Bits.out[i2];
-        } else if (i2 < 240) {
-            sel[i2].sel <== b1Bits.out[i2 - 120];
-        } else {
-            sel[i2].sel <== b2Bits.out[i2 - 240];
-        }
+    signal t3;
+    signal c3;
+    signal p3;
+    t3 <== a[1] * b[2] + a[2] * b[1] + c2;
+    c3 <-- t3 >> 120;
+    p3 <== t3 - c3 * base;
+    component p3Bits = Num2Bits(120);
+    p3Bits.in <== p3;
 
-        for (var j4 = 0; j4 < 3; j4++) {
-            acc[i2 + 1][j4] <== sel[i2].out[j4];
-            tmp[i2 + 1][j4] <== dbl[i2].out[j4];
-        }
-    }
+    signal t4;
+    signal c4;
+    signal p4;
+    t4 <== a[2] * b[2] + c3;
+    c4 <-- t4 >> 120;
+    p4 <== t4 - c4 * base;
+    component p4Bits = Num2Bits(120);
+    p4Bits.in <== p4;
+    c4 === 0;
 
-    for (var j4 = 0; j4 < 3; j4++) {
-        out[j4] <== acc[254][j4];
-    }
+    signal m0;
+    signal m1;
+    signal m2;
+    signal m3;
+    signal m4;
+    signal m5;
+    signal m6;
+    signal m7;
+    m0 <-- p0 * mu0;
+    m1 <-- p0 * mu1 + p1 * mu0;
+    m2 <-- p0 * mu2 + p1 * mu1 + p2 * mu0;
+    m3 <-- p1 * mu2 + p2 * mu1 + p3 * mu0;
+    m4 <-- p2 * mu2 + p3 * mu1 + p4 * mu0;
+    m5 <-- p3 * mu2 + p4 * mu1;
+    m6 <-- p4 * mu2;
+    m7 <-- 0;
+
+    signal l0;
+    signal l1;
+    signal l2;
+    signal l3;
+    signal l4;
+    signal l5;
+    signal l6;
+    signal l7;
+    signal l8;
+    signal mc0;
+    signal mc1;
+    signal mc2;
+    signal mc3;
+    signal mc4;
+    signal mc5;
+    signal mc6;
+    signal mc7;
+    mc0 <-- m0 >> 120;
+    l0 <-- m0 - mc0 * base;
+    mc1 <-- (m1 + mc0) >> 120;
+    l1 <-- m1 + mc0 - mc1 * base;
+    mc2 <-- (m2 + mc1) >> 120;
+    l2 <-- m2 + mc1 - mc2 * base;
+    mc3 <-- (m3 + mc2) >> 120;
+    l3 <-- m3 + mc2 - mc3 * base;
+    mc4 <-- (m4 + mc3) >> 120;
+    l4 <-- m4 + mc3 - mc4 * base;
+    mc5 <-- (m5 + mc4) >> 120;
+    l5 <-- m5 + mc4 - mc5 * base;
+    mc6 <-- (m6 + mc5) >> 120;
+    l6 <-- m6 + mc5 - mc6 * base;
+    mc7 <-- (m7 + mc6) >> 120;
+    l7 <-- m7 + mc6 - mc7 * base;
+    l8 <-- mc7;
+
+    signal q0Approx;
+    signal q1Approx;
+    signal q2Approx;
+    q0Approx <-- (l4 >> 32) + ((l5 & mask32) << 88);
+    q1Approx <-- (l5 >> 32) + ((l6 & mask32) << 88);
+    q2Approx <-- (l6 >> 32) + ((l7 & mask32) << 88);
+
+    signal aq0Raw;
+    signal aq1Raw;
+    signal aq2Raw;
+    signal aq3Raw;
+    signal aq4Raw;
+    signal aq0;
+    signal aq1;
+    signal aq2;
+    signal aq3;
+    signal aq4;
+    signal aqc0;
+    signal aqc1;
+    signal aqc2;
+    signal aqc3;
+    signal aqc4;
+    aq0Raw <-- q0Approx * mod0;
+    aqc0 <-- aq0Raw >> 120;
+    aq0 <-- aq0Raw - aqc0 * base;
+    aq1Raw <-- q0Approx * mod1 + q1Approx * mod0 + aqc0;
+    aqc1 <-- aq1Raw >> 120;
+    aq1 <-- aq1Raw - aqc1 * base;
+    aq2Raw <-- q0Approx * mod2 + q1Approx * mod1 + q2Approx * mod0 + aqc1;
+    aqc2 <-- aq2Raw >> 120;
+    aq2 <-- aq2Raw - aqc2 * base;
+    aq3Raw <-- q1Approx * mod2 + q2Approx * mod1 + aqc2;
+    aqc3 <-- aq3Raw >> 120;
+    aq3 <-- aq3Raw - aqc3 * base;
+    aq4Raw <-- q2Approx * mod2 + aqc3;
+    aqc4 <-- aq4Raw >> 120;
+    aq4 <-- aq4Raw - aqc4 * base;
+
+    signal rb0;
+    signal rb1;
+    signal rb2;
+    signal rb3;
+    signal rb4;
+    signal r0Approx;
+    signal r1Approx;
+    signal r2Approx;
+    signal r3Approx;
+    signal r4Approx;
+    rb0 <-- p0 < aq0 ? 1 : 0;
+    r0Approx <-- p0 - aq0 + rb0 * base;
+    rb1 <-- (p1 - rb0) < aq1 ? 1 : 0;
+    r1Approx <-- p1 - aq1 - rb0 + rb1 * base;
+    rb2 <-- (p2 - rb1) < aq2 ? 1 : 0;
+    r2Approx <-- p2 - aq2 - rb1 + rb2 * base;
+    rb3 <-- (p3 - rb2) < aq3 ? 1 : 0;
+    r3Approx <-- p3 - aq3 - rb2 + rb3 * base;
+    rb4 <-- (p4 - rb3) < aq4 ? 1 : 0;
+    r4Approx <-- p4 - aq4 - rb3 + rb4 * base;
+
+    signal r3NonZero;
+    signal r4NonZero;
+    signal bigFlag;
+    r3NonZero <-- r3Approx == 0 ? 0 : 1;
+    r4NonZero <-- r4Approx == 0 ? 0 : 1;
+    bigFlag <-- (r3NonZero + r4NonZero) > 0 ? 1 : 0;
+
+    signal geFlag;
+    geFlag <-- (r2Approx > mod2) ? 1 :
+        (r2Approx < mod2) ? 0 :
+        (r1Approx > mod1) ? 1 :
+        (r1Approx < mod1) ? 0 :
+        (r0Approx > mod0) ? 1 :
+        (r0Approx == mod0) ? 1 : 0;
+
+    signal needsSub;
+    needsSub <-- (bigFlag == 1) ? 1 : geFlag;
+
+    signal q0Adj;
+    signal q1Adj;
+    signal q2Adj;
+    signal qc0;
+    signal qc1;
+    signal qc2;
+    signal q0;
+    signal q1;
+    signal q2;
+    q0Adj <-- q0Approx + needsSub;
+    qc0 <-- q0Adj >> 120;
+    q0 <-- q0Adj - qc0 * base;
+    q1Adj <-- q1Approx + qc0;
+    qc1 <-- q1Adj >> 120;
+    q1 <-- q1Adj - qc1 * base;
+    q2Adj <-- q2Approx + qc1;
+    qc2 <-- q2Adj >> 120;
+    q2 <-- q2Adj - qc2 * base;
+
+    component q0Bits = Num2Bits(120);
+    component q1Bits = Num2Bits(120);
+    component q2Bits = Num2Bits(14);
+    q0Bits.in <== q0;
+    q1Bits.in <== q1;
+    q2Bits.in <== q2;
+
+    signal qm0Raw;
+    signal qm1Raw;
+    signal qm2Raw;
+    signal qm3Raw;
+    signal qm4Raw;
+    signal qm0;
+    signal qm1;
+    signal qm2;
+    signal qm3;
+    signal qm4;
+    signal qcMul0;
+    signal qcMul1;
+    signal qcMul2;
+    signal qcMul3;
+    signal qcMul4;
+    qm0Raw <== q0 * mod0;
+    qcMul0 <-- qm0Raw >> 120;
+    qm0 <== qm0Raw - qcMul0 * base;
+    qm1Raw <== q0 * mod1 + q1 * mod0 + qcMul0;
+    qcMul1 <-- qm1Raw >> 120;
+    qm1 <== qm1Raw - qcMul1 * base;
+    qm2Raw <== q0 * mod2 + q1 * mod1 + q2 * mod0 + qcMul1;
+    qcMul2 <-- qm2Raw >> 120;
+    qm2 <== qm2Raw - qcMul2 * base;
+    qm3Raw <== q1 * mod2 + q2 * mod1 + qcMul2;
+    qcMul3 <-- qm3Raw >> 120;
+    qm3 <== qm3Raw - qcMul3 * base;
+    qm4Raw <== q2 * mod2 + qcMul3;
+    qcMul4 <-- qm4Raw >> 120;
+    qm4 <== qm4Raw - qcMul4 * base;
+
+    component qm0Bits = Num2Bits(120);
+    component qm1Bits = Num2Bits(120);
+    component qm2Bits = Num2Bits(120);
+    component qm3Bits = Num2Bits(120);
+    component qm4Bits = Num2Bits(120);
+    qm0Bits.in <== qm0;
+    qm1Bits.in <== qm1;
+    qm2Bits.in <== qm2;
+    qm3Bits.in <== qm3;
+    qm4Bits.in <== qm4;
+
+    signal borrow0;
+    signal borrow1;
+    signal borrow2;
+    signal borrow3;
+    signal borrow4;
+    signal r0;
+    signal r1;
+    signal r2;
+    signal r3;
+    signal r4;
+    borrow0 <-- p0 < qm0 ? 1 : 0;
+    r0 <== p0 - qm0 + borrow0 * base;
+    borrow1 <-- (p1 - borrow0) < qm1 ? 1 : 0;
+    r1 <== p1 - qm1 - borrow0 + borrow1 * base;
+    borrow2 <-- (p2 - borrow1) < qm2 ? 1 : 0;
+    r2 <== p2 - qm2 - borrow1 + borrow2 * base;
+    borrow3 <-- (p3 - borrow2) < qm3 ? 1 : 0;
+    r3 <== p3 - qm3 - borrow2 + borrow3 * base;
+    borrow4 <-- (p4 - borrow3) < qm4 ? 1 : 0;
+    r4 <== p4 - qm4 - borrow3 + borrow4 * base;
+
+    borrow0 * (borrow0 - 1) === 0;
+    borrow1 * (borrow1 - 1) === 0;
+    borrow2 * (borrow2 - 1) === 0;
+    borrow3 * (borrow3 - 1) === 0;
+    borrow4 * (borrow4 - 1) === 0;
+    borrow4 === 0;
+    r3 === 0;
+    r4 === 0;
+
+    out[0] <== r0;
+    out[1] <== r1;
+    out[2] <== r2;
+
+    component outCheck = FpRangeCheck();
+    outCheck.in[0] <== out[0];
+    outCheck.in[1] <== out[1];
+    outCheck.in[2] <== out[2];
+
+    component lt = FpLt();
+    lt.a[0] <== out[0];
+    lt.a[1] <== out[1];
+    lt.a[2] <== out[2];
+    lt.b[0] <== mod0;
+    lt.b[1] <== mod1;
+    lt.b[2] <== mod2;
+    lt.out === 1;
 }
 
 template FpSquare() {
