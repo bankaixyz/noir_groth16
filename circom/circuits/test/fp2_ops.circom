@@ -6,6 +6,7 @@ template Fp2Ops() {
     signal input a[2][3];
     signal input b[2][3];
     signal input inv[2][3];
+    signal input inv_elem_hint[3];
 
     signal output add[2][3];
     signal output sub[2][3];
@@ -46,9 +47,11 @@ template Fp2Ops() {
             mul_op.b[i][j] <== b[i][j];
             sq_op.a[i][j] <== a[i][j];
             inv_op.a[i][j] <== a[i][j];
+            inv_op.inv[i][j] <== inv[i][j];
             mul_inv_op.a[i][j] <== a[i][j];
             mul_inv_op.b[i][j] <== inv[i][j];
             inv_inv_op.a[i][j] <== inv[i][j];
+            inv_inv_op.inv[i][j] <== a[i][j];
             neg_op.a[i][j] <== a[i][j];
             dbl_op.a[i][j] <== a[i][j];
             conj_op.a[i][j] <== a[i][j];
@@ -68,6 +71,7 @@ template Fp2Ops() {
     component inv_elem = FpInv();
     for (var j3 = 0; j3 < 3; j3++) {
         inv_elem.a[j3] <== a[0][j3];
+        inv_elem.inv[j3] <== inv_elem_hint[j3];
     }
     component mul_elem = Fp2MulByElement();
     component mul_elem_inv = Fp2MulByElement();

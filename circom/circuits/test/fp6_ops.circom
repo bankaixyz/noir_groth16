@@ -8,6 +8,7 @@ template Fp6Ops() {
     signal input inv[3][2][3];
     signal input c0[2][3];
     signal input c1[2][3];
+    signal input c0_inv_hint[2][3];
 
     signal output add[3][2][3];
     signal output sub[3][2][3];
@@ -48,9 +49,11 @@ template Fp6Ops() {
                 mul_op.b[k][i][j] <== b[k][i][j];
                 sq_op.a[k][i][j] <== a[k][i][j];
                 inv_op.a[k][i][j] <== a[k][i][j];
+                inv_op.inv[k][i][j] <== inv[k][i][j];
                 mul_inv_op.a[k][i][j] <== a[k][i][j];
                 mul_inv_op.b[k][i][j] <== inv[k][i][j];
                 inv_inv_op.a[k][i][j] <== inv[k][i][j];
+                inv_inv_op.inv[k][i][j] <== a[k][i][j];
                 neg_op.a[k][i][j] <== a[k][i][j];
                 dbl_op.a[k][i][j] <== a[k][i][j];
                 mul_nr_op.a[k][i][j] <== a[k][i][j];
@@ -72,6 +75,7 @@ template Fp6Ops() {
     for (var i3 = 0; i3 < 2; i3++) {
         for (var j3 = 0; j3 < 3; j3++) {
             c0_inv.a[i3][j3] <== c0[i3][j3];
+            c0_inv.inv[i3][j3] <== c0_inv_hint[i3][j3];
         }
     }
     component mul_e2 = Fp6MulByE2();

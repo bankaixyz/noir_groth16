@@ -1,9 +1,11 @@
 const path = require("path");
 const wasm_tester = require("circom_tester").wasm;
 const { expect } = require("chai");
+const { bigIntToLimbs, fpInv, limbsToBigInt } = require("./field");
 
 const fp = (arr) => arr.map((v) => BigInt(v));
 const fp2 = (a0, a1) => [fp(a0), fp(a1)];
+const fpInvLimbs = (value) => bigIntToLimbs(fpInv(limbsToBigInt(value)));
 
 const fpZero = fp(["0x0", "0x0", "0x0"]);
 const fp2One = fp2(["0x1", "0x0", "0x0"], ["0x0", "0x0", "0x0"]);
@@ -64,13 +66,28 @@ describe("Fp2 operations", function () {
         circuit = await wasm_tester(
             path.join(__dirname, "../circuits/test/fp2_ops.circom")
         );
-        const inputAB = { a: fixtureA, b: fixtureB, inv: fixtureAInverse };
+        const inputAB = {
+            a: fixtureA,
+            b: fixtureB,
+            inv: fixtureAInverse,
+            inv_elem_hint: fpInvLimbs(fixtureA[0]),
+        };
         witnessAB = await circuit.calculateWitness(inputAB, true);
 
-        const inputAA = { a: fixtureA, b: fixtureA, inv: fixtureAInverse };
+        const inputAA = {
+            a: fixtureA,
+            b: fixtureA,
+            inv: fixtureAInverse,
+            inv_elem_hint: fpInvLimbs(fixtureA[0]),
+        };
         witnessAA = await circuit.calculateWitness(inputAA, true);
 
-        const inputNeg = { a: fixtureANegated, b: fixtureB, inv: fixtureAInverse };
+        const inputNeg = {
+            a: fixtureANegated,
+            b: fixtureB,
+            inv: fixtureAInverse,
+            inv_elem_hint: fpInvLimbs(fixtureANegated[0]),
+        };
         witnessNeg = await circuit.calculateWitness(inputNeg, true);
     });
 

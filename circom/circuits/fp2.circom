@@ -339,13 +339,11 @@ template Fp2Halve() {
     signal input a[2][3];
     signal output out[2][3];
 
-    component one = FpConst(1, 0, 0);
-    component two = FpConst(2, 0, 0);
-    component invTwo = FpDiv();
-    for (var i = 0; i < 3; i++) {
-        invTwo.a[i] <== one.out[i];
-        invTwo.b[i] <== two.out[i];
-    }
+    component invTwo = FpConst(
+        0xc0b548b438e5469e10460b6c3e7ea4,
+        0x27397098d014dc2822db40c0ac2ecb,
+        0x1832
+    );
 
     component mul = Fp2MulByElement();
     for (var i = 0; i < 2; i++) {
@@ -468,43 +466,23 @@ template Fp2Square() {
 
 template Fp2Inverse() {
     signal input a[2][3];
+    signal input inv[2][3];
     signal output out[2][3];
 
-    component t0 = FpSquare();
-    component t1 = FpSquare();
-    for (var i = 0; i < 3; i++) {
-        t0.a[i] <== a[0][i];
-        t1.a[i] <== a[1][i];
+    component mul = Fp2Mul();
+    for (var i = 0; i < 2; i++) {
+        for (var j = 0; j < 3; j++) {
+            mul.a[i][j] <== a[i][j];
+            mul.b[i][j] <== inv[i][j];
+        }
     }
 
-    component sum = FpAdd();
-    for (var i = 0; i < 3; i++) {
-        sum.a[i] <== t0.out[i];
-        sum.b[i] <== t1.out[i];
-    }
-
-    component inv = FpInv();
-    for (var i = 0; i < 3; i++) {
-        inv.a[i] <== sum.out[i];
-    }
-
-    component c0 = FpMul();
-    component c1 = FpMul();
-    for (var i = 0; i < 3; i++) {
-        c0.a[i] <== a[0][i];
-        c0.b[i] <== inv.out[i];
-        c1.a[i] <== a[1][i];
-        c1.b[i] <== inv.out[i];
-    }
-
-    component c1_neg = FpNeg();
-    for (var i = 0; i < 3; i++) {
-        c1_neg.a[i] <== c1.out[i];
-    }
-
-    for (var i = 0; i < 3; i++) {
-        out[0][i] <== c0.out[i];
-        out[1][i] <== c1_neg.out[i];
+    component one = Fp2One();
+    for (var i2 = 0; i2 < 2; i2++) {
+        for (var j2 = 0; j2 < 3; j2++) {
+            mul.out[i2][j2] === one.out[i2][j2];
+            out[i2][j2] <== inv[i2][j2];
+        }
     }
 }
 

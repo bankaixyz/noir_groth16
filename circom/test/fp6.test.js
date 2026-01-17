@@ -1,6 +1,7 @@
 const path = require("path");
 const wasm_tester = require("circom_tester").wasm;
 const { expect } = require("chai");
+const { fp2Inv } = require("./field");
 
 const fp = (arr) => arr.map((v) => BigInt(v));
 const fp2 = (a0, a1) => [fp(a0), fp(a1)];
@@ -191,6 +192,7 @@ describe("Fp6 operations", function () {
             inv: fixtureAInverse,
             c0: fixtureSparseC0,
             c1: fixtureSparseC1,
+            c0_inv_hint: fp2Inv(fixtureSparseC0),
         };
         witnessAB = await circuit.calculateWitness(inputAB, true);
 
@@ -200,6 +202,7 @@ describe("Fp6 operations", function () {
             inv: fixtureAInverse,
             c0: fixtureSparseC0,
             c1: fixtureSparseC1,
+            c0_inv_hint: fp2Inv(fixtureSparseC0),
         };
         witnessAA = await circuit.calculateWitness(inputAA, true);
 
@@ -209,6 +212,7 @@ describe("Fp6 operations", function () {
             inv: fixtureAInverse,
             c0: fixtureSparseC0,
             c1: fixtureSparseC1,
+            c0_inv_hint: fp2Inv(fixtureSparseC0),
         };
         witnessNeg = await circuit.calculateWitness(inputNeg, true);
     });

@@ -478,137 +478,26 @@ template Fp6Square() {
 
 template Fp6Inverse() {
     signal input a[3][2][3];
+    signal input inv[3][2][3];
     signal output out[3][2][3];
 
-    component t0 = Fp2Square();
-    component t1 = Fp2Square();
-    component t2 = Fp2Square();
-    for (var i = 0; i < 2; i++) {
-        for (var j = 0; j < 3; j++) {
-            t0.a[i][j] <== a[0][i][j];
-            t1.a[i][j] <== a[1][i][j];
-            t2.a[i][j] <== a[2][i][j];
+    component mul = Fp6Mul();
+    for (var k = 0; k < 3; k++) {
+        for (var i = 0; i < 2; i++) {
+            for (var j = 0; j < 3; j++) {
+                mul.a[k][i][j] <== a[k][i][j];
+                mul.b[k][i][j] <== inv[k][i][j];
+            }
         }
     }
 
-    component t3 = Fp2Mul();
-    component t4 = Fp2Mul();
-    component t5 = Fp2Mul();
-    for (var i = 0; i < 2; i++) {
-        for (var j = 0; j < 3; j++) {
-            t3.a[i][j] <== a[0][i][j];
-            t3.b[i][j] <== a[1][i][j];
-            t4.a[i][j] <== a[0][i][j];
-            t4.b[i][j] <== a[2][i][j];
-            t5.a[i][j] <== a[1][i][j];
-            t5.b[i][j] <== a[2][i][j];
-        }
-    }
-
-    component t5_nr = Fp2MulByNonResidue();
-    for (var i = 0; i < 2; i++) {
-        for (var j = 0; j < 3; j++) {
-            t5_nr.a[i][j] <== t5.out[i][j];
-        }
-    }
-
-    component c0 = Fp2Sub();
-    for (var i = 0; i < 2; i++) {
-        for (var j = 0; j < 3; j++) {
-            c0.a[i][j] <== t0.out[i][j];
-            c0.b[i][j] <== t5_nr.out[i][j];
-        }
-    }
-
-    component t2_nr = Fp2MulByNonResidue();
-    for (var i = 0; i < 2; i++) {
-        for (var j = 0; j < 3; j++) {
-            t2_nr.a[i][j] <== t2.out[i][j];
-        }
-    }
-    component c1 = Fp2Sub();
-    for (var i = 0; i < 2; i++) {
-        for (var j = 0; j < 3; j++) {
-            c1.a[i][j] <== t2_nr.out[i][j];
-            c1.b[i][j] <== t3.out[i][j];
-        }
-    }
-
-    component c2 = Fp2Sub();
-    for (var i = 0; i < 2; i++) {
-        for (var j = 0; j < 3; j++) {
-            c2.a[i][j] <== t1.out[i][j];
-            c2.b[i][j] <== t4.out[i][j];
-        }
-    }
-
-    component t6 = Fp2Mul();
-    for (var i = 0; i < 2; i++) {
-        for (var j = 0; j < 3; j++) {
-            t6.a[i][j] <== a[0][i][j];
-            t6.b[i][j] <== c0.out[i][j];
-        }
-    }
-
-    component d1 = Fp2Mul();
-    component d2 = Fp2Mul();
-    for (var i = 0; i < 2; i++) {
-        for (var j = 0; j < 3; j++) {
-            d1.a[i][j] <== a[2][i][j];
-            d1.b[i][j] <== c1.out[i][j];
-            d2.a[i][j] <== a[1][i][j];
-            d2.b[i][j] <== c2.out[i][j];
-        }
-    }
-
-    component d1_sum = Fp2Add();
-    for (var i = 0; i < 2; i++) {
-        for (var j = 0; j < 3; j++) {
-            d1_sum.a[i][j] <== d1.out[i][j];
-            d1_sum.b[i][j] <== d2.out[i][j];
-        }
-    }
-    component d1_nr = Fp2MulByNonResidue();
-    for (var i = 0; i < 2; i++) {
-        for (var j = 0; j < 3; j++) {
-            d1_nr.a[i][j] <== d1_sum.out[i][j];
-        }
-    }
-
-    component t6_sum = Fp2Add();
-    for (var i = 0; i < 2; i++) {
-        for (var j = 0; j < 3; j++) {
-            t6_sum.a[i][j] <== t6.out[i][j];
-            t6_sum.b[i][j] <== d1_nr.out[i][j];
-        }
-    }
-
-    component t6_inv = Fp2Inverse();
-    for (var i = 0; i < 2; i++) {
-        for (var j = 0; j < 3; j++) {
-            t6_inv.a[i][j] <== t6_sum.out[i][j];
-        }
-    }
-
-    component out0 = Fp2Mul();
-    component out1 = Fp2Mul();
-    component out2 = Fp2Mul();
-    for (var i = 0; i < 2; i++) {
-        for (var j = 0; j < 3; j++) {
-            out0.a[i][j] <== c0.out[i][j];
-            out0.b[i][j] <== t6_inv.out[i][j];
-            out1.a[i][j] <== c1.out[i][j];
-            out1.b[i][j] <== t6_inv.out[i][j];
-            out2.a[i][j] <== c2.out[i][j];
-            out2.b[i][j] <== t6_inv.out[i][j];
-        }
-    }
-
-    for (var i = 0; i < 2; i++) {
-        for (var j = 0; j < 3; j++) {
-            out[0][i][j] <== out0.out[i][j];
-            out[1][i][j] <== out1.out[i][j];
-            out[2][i][j] <== out2.out[i][j];
+    component one = Fp6One();
+    for (var k2 = 0; k2 < 3; k2++) {
+        for (var i2 = 0; i2 < 2; i2++) {
+            for (var j2 = 0; j2 < 3; j2++) {
+                mul.out[k2][i2][j2] === one.out[k2][i2][j2];
+                out[k2][i2][j2] <== inv[k2][i2][j2];
+            }
         }
     }
 }

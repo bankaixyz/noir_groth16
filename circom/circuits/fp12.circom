@@ -317,74 +317,29 @@ template Fp12Square() {
 
 template Fp12Inverse() {
     signal input a[2][3][2][3];
+    signal input inv[2][3][2][3];
     signal output out[2][3][2][3];
 
-    component t0 = Fp6Square();
-    component t1 = Fp6Square();
-    for (var k = 0; k < 3; k++) {
-        for (var i = 0; i < 2; i++) {
-            for (var j = 0; j < 3; j++) {
-                t0.a[k][i][j] <== a[0][k][i][j];
-                t1.a[k][i][j] <== a[1][k][i][j];
+    component mul = Fp12Mul();
+    for (var c = 0; c < 2; c++) {
+        for (var k = 0; k < 3; k++) {
+            for (var i = 0; i < 2; i++) {
+                for (var j = 0; j < 3; j++) {
+                    mul.a[c][k][i][j] <== a[c][k][i][j];
+                    mul.b[c][k][i][j] <== inv[c][k][i][j];
+                }
             }
         }
     }
 
-    component t1_nr = Fp6MulByNonResidue();
-    for (var k2 = 0; k2 < 3; k2++) {
-        for (var i2 = 0; i2 < 2; i2++) {
-            for (var j2 = 0; j2 < 3; j2++) {
-                t1_nr.a[k2][i2][j2] <== t1.out[k2][i2][j2];
-            }
-        }
-    }
-
-    component t0_sub = Fp6Sub();
-    for (var k3 = 0; k3 < 3; k3++) {
-        for (var i3 = 0; i3 < 2; i3++) {
-            for (var j3 = 0; j3 < 3; j3++) {
-                t0_sub.a[k3][i3][j3] <== t0.out[k3][i3][j3];
-                t0_sub.b[k3][i3][j3] <== t1_nr.out[k3][i3][j3];
-            }
-        }
-    }
-
-    component inv = Fp6Inverse();
-    for (var k4 = 0; k4 < 3; k4++) {
-        for (var i4 = 0; i4 < 2; i4++) {
-            for (var j4 = 0; j4 < 3; j4++) {
-                inv.a[k4][i4][j4] <== t0_sub.out[k4][i4][j4];
-            }
-        }
-    }
-
-    component c0 = Fp6Mul();
-    component c1 = Fp6Mul();
-    for (var k5 = 0; k5 < 3; k5++) {
-        for (var i5 = 0; i5 < 2; i5++) {
-            for (var j5 = 0; j5 < 3; j5++) {
-                c0.a[k5][i5][j5] <== a[0][k5][i5][j5];
-                c0.b[k5][i5][j5] <== inv.out[k5][i5][j5];
-                c1.a[k5][i5][j5] <== a[1][k5][i5][j5];
-                c1.b[k5][i5][j5] <== inv.out[k5][i5][j5];
-            }
-        }
-    }
-
-    component c1_neg = Fp6Neg();
-    for (var k6 = 0; k6 < 3; k6++) {
-        for (var i6 = 0; i6 < 2; i6++) {
-            for (var j6 = 0; j6 < 3; j6++) {
-                c1_neg.a[k6][i6][j6] <== c1.out[k6][i6][j6];
-            }
-        }
-    }
-
-    for (var k7 = 0; k7 < 3; k7++) {
-        for (var i7 = 0; i7 < 2; i7++) {
-            for (var j7 = 0; j7 < 3; j7++) {
-                out[0][k7][i7][j7] <== c0.out[k7][i7][j7];
-                out[1][k7][i7][j7] <== c1_neg.out[k7][i7][j7];
+    component one = Fp12One();
+    for (var c2 = 0; c2 < 2; c2++) {
+        for (var k2 = 0; k2 < 3; k2++) {
+            for (var i2 = 0; i2 < 2; i2++) {
+                for (var j2 = 0; j2 < 3; j2++) {
+                    mul.out[c2][k2][i2][j2] === one.out[c2][k2][i2][j2];
+                    out[c2][k2][i2][j2] <== inv[c2][k2][i2][j2];
+                }
             }
         }
     }

@@ -35,3 +35,13 @@ template IsEqual() {
     isZero.in <== a - b;
     out <== isZero.out;
 }
+
+template Lt(n) {
+    signal input a;
+    signal input b;
+    signal output out;
+
+    component bits = Num2Bits(n + 1);
+    bits.in <== a + (1 << n) - b;
+    out <== 1 - bits.out[n];
+}

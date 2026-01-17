@@ -53,9 +53,11 @@ template Fp12Ops() {
                     mul_op.b[c][k][i][j] <== b[c][k][i][j];
                     sq_op.a[c][k][i][j] <== a[c][k][i][j];
                     inv_op.a[c][k][i][j] <== a[c][k][i][j];
+                    inv_op.inv[c][k][i][j] <== inv[c][k][i][j];
                     mul_inv_op.a[c][k][i][j] <== a[c][k][i][j];
                     mul_inv_op.b[c][k][i][j] <== inv[c][k][i][j];
                     inv_inv_op.a[c][k][i][j] <== inv[c][k][i][j];
+                    inv_inv_op.inv[c][k][i][j] <== a[c][k][i][j];
                     conj_op.a[c][k][i][j] <== a[c][k][i][j];
                     dbl_op.a[c][k][i][j] <== a[c][k][i][j];
                     dbl_op.b[c][k][i][j] <== a[c][k][i][j];
