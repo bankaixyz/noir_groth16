@@ -340,6 +340,9 @@ template FpMul() {
 
     signal acc[255][3];
     signal tmp[255][3];
+    component add[254];
+    component sel[254];
+    component dbl[254];
     acc[0][0] <== 0;
     acc[0][1] <== 0;
     acc[0][2] <== 0;
@@ -348,29 +351,29 @@ template FpMul() {
     }
 
     for (var i2 = 0; i2 < 254; i2++) {
-        component add = FpAdd();
-        component sel = FpSelect();
-        component dbl = FpDouble();
+        add[i2] = FpAdd();
+        sel[i2] = FpSelect();
+        dbl[i2] = FpDouble();
 
         for (var j2 = 0; j2 < 3; j2++) {
-            add.a[j2] <== acc[i2][j2];
-            add.b[j2] <== tmp[i2][j2];
-            sel.a[j2] <== add.out[j2];
-            sel.b[j2] <== acc[i2][j2];
-            dbl.a[j2] <== tmp[i2][j2];
+            add[i2].a[j2] <== acc[i2][j2];
+            add[i2].b[j2] <== tmp[i2][j2];
+            sel[i2].a[j2] <== add[i2].out[j2];
+            sel[i2].b[j2] <== acc[i2][j2];
+            dbl[i2].a[j2] <== tmp[i2][j2];
         }
 
         if (i2 < 120) {
-            sel.sel <== b0Bits.out[i2];
+            sel[i2].sel <== b0Bits.out[i2];
         } else if (i2 < 240) {
-            sel.sel <== b1Bits.out[i2 - 120];
+            sel[i2].sel <== b1Bits.out[i2 - 120];
         } else {
-            sel.sel <== b2Bits.out[i2 - 240];
+            sel[i2].sel <== b2Bits.out[i2 - 240];
         }
 
         for (var j3 = 0; j3 < 3; j3++) {
-            acc[i2 + 1][j3] <== sel.out[j3];
-            tmp[i2 + 1][j3] <== dbl.out[j3];
+            acc[i2 + 1][j3] <== sel[i2].out[j3];
+            tmp[i2 + 1][j3] <== dbl[i2].out[j3];
         }
     }
 
