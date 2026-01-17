@@ -129,6 +129,18 @@ template FpLt() {
     out <== lt2.out + eq2.out * mid_lt;
 }
 
+template FpSelect() {
+    signal input a[3];
+    signal input b[3];
+    signal input sel;
+    signal output out[3];
+
+    sel * (sel - 1) === 0;
+    for (var i = 0; i < 3; i++) {
+        out[i] <== b[i] + sel * (a[i] - b[i]);
+    }
+}
+
 template FpAdd() {
     signal input a[3];
     signal input b[3];
@@ -149,6 +161,8 @@ template FpAdd() {
     signal sum[3];
     signal carry0;
     signal carry1;
+    carry0 <-- (a[0] + b[0]) >> 120;
+    carry1 <-- (a[1] + b[1] + carry0) >> 120;
     carry0 * (carry0 - 1) === 0;
     carry1 * (carry1 - 1) === 0;
 
@@ -164,10 +178,30 @@ template FpAdd() {
     sum2Bits.in <== sum[2];
 
     signal overflow;
+    component sum_lt = FpLt();
+    sum_lt.a[0] <== sum[0];
+    sum_lt.a[1] <== sum[1];
+    sum_lt.a[2] <== sum[2];
+    sum_lt.b[0] <== mod0;
+    sum_lt.b[1] <== mod1;
+    sum_lt.b[2] <== mod2;
+    overflow <== 1 - sum_lt.out;
     overflow * (overflow - 1) === 0;
+
     signal borrow0;
-    signal borrow1;
+    component borrow0_lt = Lt(120);
+    borrow0_lt.a <== sum[0];
+    borrow0_lt.b <== mod0;
+    borrow0 <== overflow * borrow0_lt.out;
     borrow0 * (borrow0 - 1) === 0;
+
+    signal borrow1;
+    signal mod1_plus_borrow;
+    mod1_plus_borrow <== mod1 + borrow0;
+    component borrow1_lt = Lt(120);
+    borrow1_lt.a <== sum[1];
+    borrow1_lt.b <== mod1_plus_borrow;
+    borrow1 <== overflow * borrow1_lt.out;
     borrow1 * (borrow1 - 1) === 0;
 
     out[0] <== sum[0] - overflow * mod0 + borrow0 * base;
@@ -216,6 +250,8 @@ template FpSub() {
 
     signal borrow0;
     signal borrow1;
+    borrow0 <-- (a[0] + underflow.out * mod0) < b[0] ? 1 : 0;
+    borrow1 <-- (a[1] + underflow.out * mod1 - borrow0) < b[1] ? 1 : 0;
     borrow0 * (borrow0 - 1) === 0;
     borrow1 * (borrow1 - 1) === 0;
 
@@ -254,6 +290,8 @@ template FpNeg() {
 
     signal borrow0;
     signal borrow1;
+    borrow0 <-- mod0 < a[0] ? 1 : 0;
+    borrow1 <-- (mod1 - borrow0) < a[1] ? 1 : 0;
     borrow0 * (borrow0 - 1) === 0;
     borrow1 * (borrow1 - 1) === 0;
 
@@ -286,11 +324,6 @@ template FpMul() {
     signal input b[3];
     signal output out[3];
 
-    var base = 1 << 120;
-    var mod0 = 0x816a916871ca8d3c208c16d87cfd47;
-    var mod1 = 0x4e72e131a029b85045b68181585d97;
-    var mod2 = 0x3064;
-
     component aCheck = FpRangeCheck();
     component bCheck = FpRangeCheck();
     for (var i = 0; i < 3; i++) {
@@ -298,124 +331,52 @@ template FpMul() {
         bCheck.in[i] <== b[i];
     }
 
-    signal t0;
-    signal t1;
-    signal t2;
-    signal t3;
-    signal t4;
-    t0 <== a[0] * b[0];
-    t1 <== a[0] * b[1] + a[1] * b[0];
-    t2 <== a[0] * b[2] + a[1] * b[1] + a[2] * b[0];
-    t3 <== a[1] * b[2] + a[2] * b[1];
-    t4 <== a[2] * b[2];
+    component b0Bits = Num2Bits(120);
+    component b1Bits = Num2Bits(120);
+    component b2Bits = Num2Bits(14);
+    b0Bits.in <== b[0];
+    b1Bits.in <== b[1];
+    b2Bits.in <== b[2];
 
-    signal prod[5];
-    signal carry0;
-    signal carry1;
-    signal carry2;
-    signal carry3;
-    prod[0] <== t0 - carry0 * base;
-    prod[1] <== t1 + carry0 - carry1 * base;
-    prod[2] <== t2 + carry1 - carry2 * base;
-    prod[3] <== t3 + carry2 - carry3 * base;
-    prod[4] <== t4 + carry3;
-
-    component prod0Bits = Num2Bits(120);
-    component prod1Bits = Num2Bits(120);
-    component prod2Bits = Num2Bits(120);
-    component prod3Bits = Num2Bits(120);
-    component prod4Bits = Num2Bits(120);
-    prod0Bits.in <== prod[0];
-    prod1Bits.in <== prod[1];
-    prod2Bits.in <== prod[2];
-    prod3Bits.in <== prod[3];
-    prod4Bits.in <== prod[4];
-
-    component carry0Bits = Num2Bits(134);
-    component carry1Bits = Num2Bits(134);
-    component carry2Bits = Num2Bits(134);
-    component carry3Bits = Num2Bits(134);
-    carry0Bits.in <== carry0;
-    carry1Bits.in <== carry1;
-    carry2Bits.in <== carry2;
-    carry3Bits.in <== carry3;
-
-    signal q[3];
-    component qCheck = FpRangeCheck();
+    signal acc[255][3];
+    signal tmp[255][3];
+    acc[0][0] <== 0;
+    acc[0][1] <== 0;
+    acc[0][2] <== 0;
     for (var j = 0; j < 3; j++) {
-        qCheck.in[j] <== q[j];
+        tmp[0][j] <== a[j];
     }
 
-    signal qt0;
-    signal qt1;
-    signal qt2;
-    signal qt3;
-    signal qt4;
-    qt0 <== q[0] * mod0;
-    qt1 <== q[0] * mod1 + q[1] * mod0;
-    qt2 <== q[0] * mod2 + q[1] * mod1 + q[2] * mod0;
-    qt3 <== q[1] * mod2 + q[2] * mod1;
-    qt4 <== q[2] * mod2;
+    for (var i2 = 0; i2 < 254; i2++) {
+        component add = FpAdd();
+        component sel = FpSelect();
+        component dbl = FpDouble();
 
-    signal qmod[5];
-    signal qcarry0;
-    signal qcarry1;
-    signal qcarry2;
-    signal qcarry3;
-    qmod[0] <== qt0 - qcarry0 * base;
-    qmod[1] <== qt1 + qcarry0 - qcarry1 * base;
-    qmod[2] <== qt2 + qcarry1 - qcarry2 * base;
-    qmod[3] <== qt3 + qcarry2 - qcarry3 * base;
-    qmod[4] <== qt4 + qcarry3;
+        for (var j2 = 0; j2 < 3; j2++) {
+            add.a[j2] <== acc[i2][j2];
+            add.b[j2] <== tmp[i2][j2];
+            sel.a[j2] <== add.out[j2];
+            sel.b[j2] <== acc[i2][j2];
+            dbl.a[j2] <== tmp[i2][j2];
+        }
 
-    component qmod0Bits = Num2Bits(120);
-    component qmod1Bits = Num2Bits(120);
-    component qmod2Bits = Num2Bits(120);
-    component qmod3Bits = Num2Bits(120);
-    component qmod4Bits = Num2Bits(120);
-    qmod0Bits.in <== qmod[0];
-    qmod1Bits.in <== qmod[1];
-    qmod2Bits.in <== qmod[2];
-    qmod3Bits.in <== qmod[3];
-    qmod4Bits.in <== qmod[4];
+        if (i2 < 120) {
+            sel.sel <== b0Bits.out[i2];
+        } else if (i2 < 240) {
+            sel.sel <== b1Bits.out[i2 - 120];
+        } else {
+            sel.sel <== b2Bits.out[i2 - 240];
+        }
 
-    component qcarry0Bits = Num2Bits(134);
-    component qcarry1Bits = Num2Bits(134);
-    component qcarry2Bits = Num2Bits(134);
-    component qcarry3Bits = Num2Bits(134);
-    qcarry0Bits.in <== qcarry0;
-    qcarry1Bits.in <== qcarry1;
-    qcarry2Bits.in <== qcarry2;
-    qcarry3Bits.in <== qcarry3;
-
-    signal addc0;
-    signal addc1;
-    signal addc2;
-    signal addc3;
-    addc0 * (addc0 - 1) === 0;
-    addc1 * (addc1 - 1) === 0;
-    addc2 * (addc2 - 1) === 0;
-    addc3 * (addc3 - 1) === 0;
-
-    qmod[0] + out[0] - prod[0] - addc0 * base === 0;
-    qmod[1] + out[1] + addc0 - prod[1] - addc1 * base === 0;
-    qmod[2] + out[2] + addc1 - prod[2] - addc2 * base === 0;
-    qmod[3] + addc2 - prod[3] - addc3 * base === 0;
-    qmod[4] + addc3 - prod[4] === 0;
-
-    component outCheck = FpRangeCheck();
-    for (var k = 0; k < 3; k++) {
-        outCheck.in[k] <== out[k];
+        for (var j3 = 0; j3 < 3; j3++) {
+            acc[i2 + 1][j3] <== sel.out[j3];
+            tmp[i2 + 1][j3] <== dbl.out[j3];
+        }
     }
 
-    component lt = FpLt();
-    lt.a[0] <== out[0];
-    lt.a[1] <== out[1];
-    lt.a[2] <== out[2];
-    lt.b[0] <== mod0;
-    lt.b[1] <== mod1;
-    lt.b[2] <== mod2;
-    lt.out === 1;
+    for (var j4 = 0; j4 < 3; j4++) {
+        out[j4] <== acc[254][j4];
+    }
 }
 
 template FpSquare() {
