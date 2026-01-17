@@ -354,26 +354,31 @@ template FpMul() {
         add[i2] = FpAdd();
         sel[i2] = FpSelect();
         dbl[i2] = FpDouble();
-
         for (var j2 = 0; j2 < 3; j2++) {
             add[i2].a[j2] <== acc[i2][j2];
             add[i2].b[j2] <== tmp[i2][j2];
-            sel[i2].a[j2] <== add[i2].out[j2];
-            sel[i2].b[j2] <== acc[i2][j2];
             dbl[i2].a[j2] <== tmp[i2][j2];
         }
+    }
 
-        if (i2 < 120) {
-            sel[i2].sel <== b0Bits.out[i2];
-        } else if (i2 < 240) {
-            sel[i2].sel <== b1Bits.out[i2 - 120];
-        } else {
-            sel[i2].sel <== b2Bits.out[i2 - 240];
-        }
-
+    for (var i3 = 0; i3 < 254; i3++) {
         for (var j3 = 0; j3 < 3; j3++) {
-            acc[i2 + 1][j3] <== sel[i2].out[j3];
-            tmp[i2 + 1][j3] <== dbl[i2].out[j3];
+            sel[i3].a[j3] <== add[i3].out[j3];
+            sel[i3].b[j3] <== acc[i3][j3];
+        }
+        if (i3 < 120) {
+            sel[i3].sel <== b0Bits.out[i3];
+        } else if (i3 < 240) {
+            sel[i3].sel <== b1Bits.out[i3 - 120];
+        } else {
+            sel[i3].sel <== b2Bits.out[i3 - 240];
+        }
+    }
+
+    for (var i4 = 0; i4 < 254; i4++) {
+        for (var j4 = 0; j4 < 3; j4++) {
+            acc[i4 + 1][j4] <== sel[i4].out[j4];
+            tmp[i4 + 1][j4] <== dbl[i4].out[j4];
         }
     }
 
