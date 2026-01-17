@@ -1,11 +1,13 @@
 const path = require("path");
 const wasm_tester = require("circom_tester").wasm;
 const { expect } = require("chai");
-const { bigIntToLimbs, fpInv, limbsToBigInt } = require("./field");
+const { bigIntToLimbs, fpInv, limbsToBigInt, mod } = require("./field");
 
 const fp = (arr) => arr.map((v) => BigInt(v));
 const fp2 = (a0, a1) => [fp(a0), fp(a1)];
 const fpInvLimbs = (value) => bigIntToLimbs(fpInv(limbsToBigInt(value)));
+const fpNeg = (value) => bigIntToLimbs(mod(-limbsToBigInt(value)));
+const fp2Neg = (value) => [fpNeg(value[0]), fpNeg(value[1])];
 
 const fpZero = fp(["0x0", "0x0", "0x0"]);
 const fp2One = fp2(["0x1", "0x0", "0x0"], ["0x0", "0x0", "0x0"]);
@@ -38,6 +40,7 @@ const fixtureAInverse = fp2(
     ["0x8a243c36e3da37b7fe8c95b2f8d88f", "0x41f27e85c9e524a276536b8716b0e1", "0x338"],
     ["0xa5e13e64c7092959ecc7c70195063f", "0x16d17bc691c20ecb48676cb53e8417", "0x27a3"]
 );
+const fixtureANegInverse = fp2Neg(fixtureAInverse);
 const fixtureANegated = fp2(
     ["0xf1b12d7bd6fca1aa01f7580f09e7f9", "0x9e1462407591cb44c7cbb608bab568", "0x19f1"],
     ["0x64151536cc669b939cf456db1d68e3", "0xeed2a9ccb5bf313e212ef2e14c41c1", "0x19d7"]
@@ -85,7 +88,7 @@ describe("Fp2 operations", function () {
         const inputNeg = {
             a: fixtureANegated,
             b: fixtureB,
-            inv: fixtureAInverse,
+            inv: fixtureANegInverse,
             inv_elem_hint: fpInvLimbs(fixtureANegated[0]),
         };
         witnessNeg = await circuit.calculateWitness(inputNeg, true);

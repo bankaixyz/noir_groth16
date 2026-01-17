@@ -1,11 +1,14 @@
 const path = require("path");
 const wasm_tester = require("circom_tester").wasm;
 const { expect } = require("chai");
-const { fp2Inv } = require("./field");
+const { bigIntToLimbs, limbsToBigInt, mod, fp2Inv } = require("./field");
 
 const fp = (arr) => arr.map((v) => BigInt(v));
 const fp2 = (a0, a1) => [fp(a0), fp(a1)];
 const fp6 = (b0, b1, b2) => [b0, b1, b2];
+const fpNeg = (value) => bigIntToLimbs(mod(-limbsToBigInt(value)));
+const fp2Neg = (value) => [fpNeg(value[0]), fpNeg(value[1])];
+const fp6Neg = (value) => [fp2Neg(value[0]), fp2Neg(value[1]), fp2Neg(value[2])];
 
 const fpZero = fp(["0x0", "0x0", "0x0"]);
 const fp2Zero = fp2(["0x0", "0x0", "0x0"], ["0x0", "0x0", "0x0"]);
@@ -110,6 +113,7 @@ const fixtureAInverse = fp6(
         ["0x93881802b1169bbe326991f4e9bd58", "0xa08c23dff5d1071b535403f48d9eea", "0x149f"]
     )
 );
+const fixtureANegInverse = fp6Neg(fixtureAInverse);
 const fixtureANegated = fp6(
     fp2(
         ["0x8a996f4439bd78b6c8b21c50942014", "0x87b4a9774aea8eef3c18d614f7973e", "0x729"],
@@ -209,7 +213,7 @@ describe("Fp6 operations", function () {
         const inputNeg = {
             a: fixtureANegated,
             b: fixtureB,
-            inv: fixtureAInverse,
+            inv: fixtureANegInverse,
             c0: fixtureSparseC0,
             c1: fixtureSparseC1,
             c0_inv_hint: fp2Inv(fixtureSparseC0),
