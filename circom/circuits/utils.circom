@@ -7,6 +7,7 @@ template Num2Bits(n) {
     var acc = 0;
     var exp = 1;
     for (var i = 0; i < n; i++) {
+        out[i] <-- (in >> i) & 1;
         out[i] * (out[i] - 1) === 0;
         acc += out[i] * exp;
         exp = exp * 2;

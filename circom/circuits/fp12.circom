@@ -814,12 +814,12 @@ template Fp12MulBy034() {
             }
         }
     }
-    component c0 = Fp6Add();
+    component c0_sum = Fp6Add();
     for (var k8 = 0; k8 < 3; k8++) {
         for (var i8 = 0; i8 < 2; i8++) {
             for (var j8 = 0; j8 < 3; j8++) {
-                c0.a[k8][i8][j8] <== b_nr.out[k8][i8][j8];
-                c0.b[k8][i8][j8] <== a_mul.out[k8][i8][j8];
+                c0_sum.a[k8][i8][j8] <== b_nr.out[k8][i8][j8];
+                c0_sum.b[k8][i8][j8] <== a_mul.out[k8][i8][j8];
             }
         }
     }
@@ -827,7 +827,7 @@ template Fp12MulBy034() {
     for (var k9 = 0; k9 < 3; k9++) {
         for (var i9 = 0; i9 < 2; i9++) {
             for (var j9 = 0; j9 < 3; j9++) {
-                out[0][k9][i9][j9] <== c0.out[k9][i9][j9];
+                out[0][k9][i9][j9] <== c0_sum.out[k9][i9][j9];
                 out[1][k9][i9][j9] <== c1_sub2.out[k9][i9][j9];
             }
         }
