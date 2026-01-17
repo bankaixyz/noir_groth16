@@ -222,7 +222,8 @@ describe("Pairing operations", function () {
     let circuit;
     before(async () => {
         circuit = await wasm_tester(
-            path.join(__dirname, "../circuits/test/pairing_ops.circom")
+            path.join(__dirname, "../circuits/test/pairing_ops.circom"),
+            { O: 0 }
         );
     });
 
