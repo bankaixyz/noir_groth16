@@ -248,16 +248,33 @@ template FpSub() {
     underflow.b[1] <== b[1];
     underflow.b[2] <== b[2];
 
+    signal sum0Raw;
+    signal sum1Raw;
+    signal sum0;
+    signal sum1;
+    signal sum2;
+    signal carry0;
+    signal carry1;
+    sum0Raw <== a[0] + underflow.out * mod0;
+    carry0 <-- sum0Raw >> 120;
+    sum0 <== sum0Raw - carry0 * base;
+    sum1Raw <== a[1] + underflow.out * mod1 + carry0;
+    carry1 <-- sum1Raw >> 120;
+    sum1 <== sum1Raw - carry1 * base;
+    sum2 <== a[2] + underflow.out * mod2 + carry1;
+    carry0 * (carry0 - 1) === 0;
+    carry1 * (carry1 - 1) === 0;
+
     signal borrow0;
     signal borrow1;
-    borrow0 <-- (a[0] + underflow.out * mod0) < b[0] ? 1 : 0;
-    borrow1 <-- (a[1] + underflow.out * mod1 - borrow0) < b[1] ? 1 : 0;
+    borrow0 <-- sum0 < b[0] ? 1 : 0;
+    borrow1 <-- (sum1 - borrow0) < b[1] ? 1 : 0;
     borrow0 * (borrow0 - 1) === 0;
     borrow1 * (borrow1 - 1) === 0;
 
-    out[0] <== a[0] - b[0] + underflow.out * mod0 + borrow0 * base;
-    out[1] <== a[1] - b[1] + underflow.out * mod1 - borrow0 + borrow1 * base;
-    out[2] <== a[2] - b[2] + underflow.out * mod2 - borrow1;
+    out[0] <== sum0 - b[0] + borrow0 * base;
+    out[1] <== sum1 - b[1] - borrow0 + borrow1 * base;
+    out[2] <== sum2 - b[2] - borrow1;
 
     component outCheck = FpRangeCheck();
     for (var j = 0; j < 3; j++) {
