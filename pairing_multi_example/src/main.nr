@@ -58,6 +58,6 @@ pub fn main(negate_p1: bool) -> pub Fp12 {
     let p1 = if negate_p1 { neg_g1_affine(p1) } else { p1 };
     let q0 = g2_vector_single_generators();
     let q1 = g2_vector_single_3g2();
-    pairing_multi([p0, p1, p1, p0], [q0, q1, q1, q0])
+    pairing_multi([p0, p1], [q0, q1])
 }
     

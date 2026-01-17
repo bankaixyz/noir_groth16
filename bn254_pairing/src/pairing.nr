@@ -58,15 +58,6 @@ fn filter_pairs<let N: u32>(
 pub fn miller_loop<let N: u32>(p_list: [G1Affine; N], q_list: [G2Affine; N]) -> Fp12 {
     let (p, q, n) = filter_pairs(p_list, q_list);
     let mut result = fp12_one();
-    // #region agent log
-    if n == 0 {
-        println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H1\",\"location\":\"pairing.nr:60\",\"message\":\"pair_count\",\"data\":{\"val\":\"n_eq_0\"},\"timestamp\":0}");
-    } else if n == 1 {
-        println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H1\",\"location\":\"pairing.nr:60\",\"message\":\"pair_count\",\"data\":{\"val\":\"n_eq_1\"},\"timestamp\":0}");
-    } else {
-        println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H1\",\"location\":\"pairing.nr:60\",\"message\":\"pair_count\",\"data\":{\"val\":\"n_gt_1\"},\"timestamp\":0}");
-    }
-    // #endregion agent log
 
     if n != 0 {
         let mut q_proj = [projective_from_affine_g2(g2_affine_infinity()); N];
@@ -85,26 +76,6 @@ pub fn miller_loop<let N: u32>(p_list: [G1Affine; N], q_list: [G2Affine; N]) -> 
             result.c0.b0 = line.r0;
             result.c1.b0 = line.r1;
             result.c1.b1 = line.r2;
-            // #region agent log
-            let r0_zero = (line.r0.c0 == fp_zero()) & (line.r0.c1 == fp_zero());
-            let r1_zero = (line.r1.c0 == fp_zero()) & (line.r1.c1 == fp_zero());
-            let r2_zero = (line.r2.c0 == fp_zero()) & (line.r2.c1 == fp_zero());
-            if r0_zero {
-                println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H2\",\"location\":\"pairing.nr:79\",\"message\":\"line0_r0_zero\",\"data\":{\"val\":\"true\"},\"timestamp\":0}");
-            } else {
-                println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H2\",\"location\":\"pairing.nr:79\",\"message\":\"line0_r0_zero\",\"data\":{\"val\":\"false\"},\"timestamp\":0}");
-            }
-            if r1_zero {
-                println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H2\",\"location\":\"pairing.nr:80\",\"message\":\"line0_r1_zero\",\"data\":{\"val\":\"true\"},\"timestamp\":0}");
-            } else {
-                println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H2\",\"location\":\"pairing.nr:80\",\"message\":\"line0_r1_zero\",\"data\":{\"val\":\"false\"},\"timestamp\":0}");
-            }
-            if r2_zero {
-                println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H2\",\"location\":\"pairing.nr:81\",\"message\":\"line0_r2_zero\",\"data\":{\"val\":\"true\"},\"timestamp\":0}");
-            } else {
-                println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H2\",\"location\":\"pairing.nr:81\",\"message\":\"line0_r2_zero\",\"data\":{\"val\":\"false\"},\"timestamp\":0}");
-            }
-            // #endregion agent log
         }
 
         if n >= 2 {
@@ -150,52 +121,8 @@ pub fn miller_loop<let N: u32>(p_list: [G1Affine; N], q_list: [G2Affine; N]) -> 
                 result = result.mul_by_01234(prod_lines);
             }
         }
-        // #region agent log
-        if result.is_one() {
-            println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H3\",\"location\":\"pairing.nr:132\",\"message\":\"after_i63_is_one\",\"data\":{\"val\":\"true\"},\"timestamp\":0}");
-        } else {
-            println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H3\",\"location\":\"pairing.nr:132\",\"message\":\"after_i63_is_one\",\"data\":{\"val\":\"false\"},\"timestamp\":0}");
-        }
-        // #endregion agent log
 
         let loop_digits = loop_counter();
-        // #region agent log
-        if loop_digits[65] == 0i8 {
-            println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H1\",\"location\":\"pairing.nr:136\",\"message\":\"loop_digit_65\",\"data\":{\"val\":\"0\"},\"timestamp\":0}");
-        } else if loop_digits[65] == 1i8 {
-            println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H1\",\"location\":\"pairing.nr:136\",\"message\":\"loop_digit_65\",\"data\":{\"val\":\"1\"},\"timestamp\":0}");
-        } else {
-            println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H1\",\"location\":\"pairing.nr:136\",\"message\":\"loop_digit_65\",\"data\":{\"val\":\"-1\"},\"timestamp\":0}");
-        }
-        if loop_digits[64] == 0i8 {
-            println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H1\",\"location\":\"pairing.nr:137\",\"message\":\"loop_digit_64\",\"data\":{\"val\":\"0\"},\"timestamp\":0}");
-        } else if loop_digits[64] == 1i8 {
-            println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H1\",\"location\":\"pairing.nr:137\",\"message\":\"loop_digit_64\",\"data\":{\"val\":\"1\"},\"timestamp\":0}");
-        } else {
-            println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H1\",\"location\":\"pairing.nr:137\",\"message\":\"loop_digit_64\",\"data\":{\"val\":\"-1\"},\"timestamp\":0}");
-        }
-        if loop_digits[63] == 0i8 {
-            println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H1\",\"location\":\"pairing.nr:138\",\"message\":\"loop_digit_63\",\"data\":{\"val\":\"0\"},\"timestamp\":0}");
-        } else if loop_digits[63] == 1i8 {
-            println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H1\",\"location\":\"pairing.nr:138\",\"message\":\"loop_digit_63\",\"data\":{\"val\":\"1\"},\"timestamp\":0}");
-        } else {
-            println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H1\",\"location\":\"pairing.nr:138\",\"message\":\"loop_digit_63\",\"data\":{\"val\":\"-1\"},\"timestamp\":0}");
-        }
-        if loop_digits[62] == 0i8 {
-            println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H1\",\"location\":\"pairing.nr:139\",\"message\":\"loop_digit_62\",\"data\":{\"val\":\"0\"},\"timestamp\":0}");
-        } else if loop_digits[62] == 1i8 {
-            println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H1\",\"location\":\"pairing.nr:139\",\"message\":\"loop_digit_62\",\"data\":{\"val\":\"1\"},\"timestamp\":0}");
-        } else {
-            println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H1\",\"location\":\"pairing.nr:139\",\"message\":\"loop_digit_62\",\"data\":{\"val\":\"-1\"},\"timestamp\":0}");
-        }
-        if loop_digits[0] == 0i8 {
-            println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H1\",\"location\":\"pairing.nr:140\",\"message\":\"loop_digit_0\",\"data\":{\"val\":\"0\"},\"timestamp\":0}");
-        } else if loop_digits[0] == 1i8 {
-            println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H1\",\"location\":\"pairing.nr:140\",\"message\":\"loop_digit_0\",\"data\":{\"val\":\"1\"},\"timestamp\":0}");
-        } else {
-            println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H1\",\"location\":\"pairing.nr:140\",\"message\":\"loop_digit_0\",\"data\":{\"val\":\"-1\"},\"timestamp\":0}");
-        }
-        // #endregion agent log
         for idx in 0..63 {
             let i = 62 - idx;
             result = result.square();
@@ -228,13 +155,6 @@ pub fn miller_loop<let N: u32>(p_list: [G1Affine; N], q_list: [G2Affine; N]) -> 
                 }
             }
         }
-        // #region agent log
-        if result.is_one() {
-            println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H4\",\"location\":\"pairing.nr:171\",\"message\":\"after_loop_is_one\",\"data\":{\"val\":\"true\"},\"timestamp\":0}");
-        } else {
-            println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H4\",\"location\":\"pairing.nr:171\",\"message\":\"after_loop_is_one\",\"data\":{\"val\":\"false\"},\"timestamp\":0}");
-        }
-        // #endregion agent log
 
         for k in 0..N {
             if k < n {
@@ -253,13 +173,6 @@ pub fn miller_loop<let N: u32>(p_list: [G1Affine; N], q_list: [G2Affine; N]) -> 
                 result = result.mul_by_01234(prod_lines);
             }
         }
-        // #region agent log
-        if result.is_one() {
-            println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H4\",\"location\":\"pairing.nr:189\",\"message\":\"after_final_lines_is_one\",\"data\":{\"val\":\"true\"},\"timestamp\":0}");
-        } else {
-            println("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H4\",\"location\":\"pairing.nr:189\",\"message\":\"after_final_lines_is_one\",\"data\":{\"val\":\"false\"},\"timestamp\":0}");
-        }
-        // #endregion agent log
     }
 
     result
