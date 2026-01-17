@@ -31,15 +31,15 @@ template PairingOps() {
         }
     }
 
-    component miller_2g1 = PairingMillerLoop(1);
+    component miller_2g1_calc = PairingMillerLoop(1);
     for (var j3 = 0; j3 < 3; j3++) {
-        miller_2g1.p[0][0][j3] <== g1_2g1[0][j3];
-        miller_2g1.p[0][1][j3] <== g1_2g1[1][j3];
+        miller_2g1_calc.p[0][0][j3] <== g1_2g1[0][j3];
+        miller_2g1_calc.p[0][1][j3] <== g1_2g1[1][j3];
     }
     for (var i3 = 0; i3 < 2; i3++) {
         for (var j4 = 0; j4 < 3; j4++) {
-            miller_2g1.q[0][0][i3][j4] <== g2_gen[0][i3][j4];
-            miller_2g1.q[0][1][i3][j4] <== g2_gen[1][i3][j4];
+            miller_2g1_calc.q[0][0][i3][j4] <== g2_gen[0][i3][j4];
+            miller_2g1_calc.q[0][1][i3][j4] <== g2_gen[1][i3][j4];
         }
     }
 
@@ -131,7 +131,7 @@ template PairingOps() {
             for (var i11 = 0; i11 < 2; i11++) {
                 for (var j16 = 0; j16 < 3; j16++) {
                     miller_gen[c4][b4][i11][j16] <== miller_single.out[c4][b4][i11][j16];
-                    miller_2g1[c4][b4][i11][j16] <== miller_2g1.out[c4][b4][i11][j16];
+                    miller_2g1[c4][b4][i11][j16] <== miller_2g1_calc.out[c4][b4][i11][j16];
                     miller_multi[c4][b4][i11][j16] <== miller_multi_2.out[c4][b4][i11][j16];
                     pairing_gen[c4][b4][i11][j16] <== pairing_single.out[c4][b4][i11][j16];
                     pairing_2g1[c4][b4][i11][j16] <== pairing_2g1_single.out[c4][b4][i11][j16];
