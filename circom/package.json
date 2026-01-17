@@ -1,0 +1,21 @@
+{
+  "name": "circom",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "mocha"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "chai": "^6.2.2",
+    "circom_tester": "^0.0.24",
+    "mocha": "^11.7.5",
+    "snarkjs": "^0.7.6"
+  }
+}
