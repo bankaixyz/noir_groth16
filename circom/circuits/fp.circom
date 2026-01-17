@@ -2,11 +2,6 @@ pragma circom 2.0.0;
 
 include "./utils.circom";
 
-var FP_MOD_L0 = 0x816a916871ca8d3c208c16d87cfd47;
-var FP_MOD_L1 = 0x4e72e131a029b85045b68181585d97;
-var FP_MOD_L2 = 0x3064;
-var FP_BASE = 1 << 120;
-
 template FpConst(l0, l1, l2) {
     signal output out[3];
 
@@ -139,6 +134,11 @@ template FpAdd() {
     signal input b[3];
     signal output out[3];
 
+    var base = 1 << 120;
+    var mod0 = 0x816a916871ca8d3c208c16d87cfd47;
+    var mod1 = 0x4e72e131a029b85045b68181585d97;
+    var mod2 = 0x3064;
+
     component aCheck = FpRangeCheck();
     component bCheck = FpRangeCheck();
     for (var i = 0; i < 3; i++) {
@@ -152,8 +152,8 @@ template FpAdd() {
     carry0 * (carry0 - 1) === 0;
     carry1 * (carry1 - 1) === 0;
 
-    sum[0] <== a[0] + b[0] - carry0 * FP_BASE;
-    sum[1] <== a[1] + b[1] + carry0 - carry1 * FP_BASE;
+    sum[0] <== a[0] + b[0] - carry0 * base;
+    sum[1] <== a[1] + b[1] + carry0 - carry1 * base;
     sum[2] <== a[2] + b[2] + carry1;
 
     component sum0Bits = Num2Bits(120);
@@ -170,9 +170,9 @@ template FpAdd() {
     borrow0 * (borrow0 - 1) === 0;
     borrow1 * (borrow1 - 1) === 0;
 
-    out[0] <== sum[0] - overflow * FP_MOD_L0 + borrow0 * FP_BASE;
-    out[1] <== sum[1] - overflow * FP_MOD_L1 - borrow0 + borrow1 * FP_BASE;
-    out[2] <== sum[2] - overflow * FP_MOD_L2 - borrow1;
+    out[0] <== sum[0] - overflow * mod0 + borrow0 * base;
+    out[1] <== sum[1] - overflow * mod1 - borrow0 + borrow1 * base;
+    out[2] <== sum[2] - overflow * mod2 - borrow1;
 
     component outCheck = FpRangeCheck();
     for (var j = 0; j < 3; j++) {
@@ -183,9 +183,9 @@ template FpAdd() {
     lt.a[0] <== out[0];
     lt.a[1] <== out[1];
     lt.a[2] <== out[2];
-    lt.b[0] <== FP_MOD_L0;
-    lt.b[1] <== FP_MOD_L1;
-    lt.b[2] <== FP_MOD_L2;
+    lt.b[0] <== mod0;
+    lt.b[1] <== mod1;
+    lt.b[2] <== mod2;
     lt.out === 1;
 }
 
@@ -193,6 +193,11 @@ template FpSub() {
     signal input a[3];
     signal input b[3];
     signal output out[3];
+
+    var base = 1 << 120;
+    var mod0 = 0x816a916871ca8d3c208c16d87cfd47;
+    var mod1 = 0x4e72e131a029b85045b68181585d97;
+    var mod2 = 0x3064;
 
     component aCheck = FpRangeCheck();
     component bCheck = FpRangeCheck();
@@ -214,9 +219,9 @@ template FpSub() {
     borrow0 * (borrow0 - 1) === 0;
     borrow1 * (borrow1 - 1) === 0;
 
-    out[0] <== a[0] - b[0] + underflow.out * FP_MOD_L0 + borrow0 * FP_BASE;
-    out[1] <== a[1] - b[1] + underflow.out * FP_MOD_L1 - borrow0 + borrow1 * FP_BASE;
-    out[2] <== a[2] - b[2] + underflow.out * FP_MOD_L2 - borrow1;
+    out[0] <== a[0] - b[0] + underflow.out * mod0 + borrow0 * base;
+    out[1] <== a[1] - b[1] + underflow.out * mod1 - borrow0 + borrow1 * base;
+    out[2] <== a[2] - b[2] + underflow.out * mod2 - borrow1;
 
     component outCheck = FpRangeCheck();
     for (var j = 0; j < 3; j++) {
@@ -227,15 +232,20 @@ template FpSub() {
     lt.a[0] <== out[0];
     lt.a[1] <== out[1];
     lt.a[2] <== out[2];
-    lt.b[0] <== FP_MOD_L0;
-    lt.b[1] <== FP_MOD_L1;
-    lt.b[2] <== FP_MOD_L2;
+    lt.b[0] <== mod0;
+    lt.b[1] <== mod1;
+    lt.b[2] <== mod2;
     lt.out === 1;
 }
 
 template FpNeg() {
     signal input a[3];
     signal output out[3];
+
+    var base = 1 << 120;
+    var mod0 = 0x816a916871ca8d3c208c16d87cfd47;
+    var mod1 = 0x4e72e131a029b85045b68181585d97;
+    var mod2 = 0x3064;
 
     component aCheck = FpRangeCheck();
     for (var i = 0; i < 3; i++) {
@@ -247,9 +257,9 @@ template FpNeg() {
     borrow0 * (borrow0 - 1) === 0;
     borrow1 * (borrow1 - 1) === 0;
 
-    out[0] <== FP_MOD_L0 - a[0] + borrow0 * FP_BASE;
-    out[1] <== FP_MOD_L1 - a[1] - borrow0 + borrow1 * FP_BASE;
-    out[2] <== FP_MOD_L2 - a[2] - borrow1;
+    out[0] <== mod0 - a[0] + borrow0 * base;
+    out[1] <== mod1 - a[1] - borrow0 + borrow1 * base;
+    out[2] <== mod2 - a[2] - borrow1;
 
     component outCheck = FpRangeCheck();
     for (var j = 0; j < 3; j++) {
@@ -276,6 +286,11 @@ template FpMul() {
     signal input b[3];
     signal output out[3];
 
+    var base = 1 << 120;
+    var mod0 = 0x816a916871ca8d3c208c16d87cfd47;
+    var mod1 = 0x4e72e131a029b85045b68181585d97;
+    var mod2 = 0x3064;
+
     component aCheck = FpRangeCheck();
     component bCheck = FpRangeCheck();
     for (var i = 0; i < 3; i++) {
@@ -299,10 +314,10 @@ template FpMul() {
     signal carry1;
     signal carry2;
     signal carry3;
-    prod[0] <== t0 - carry0 * FP_BASE;
-    prod[1] <== t1 + carry0 - carry1 * FP_BASE;
-    prod[2] <== t2 + carry1 - carry2 * FP_BASE;
-    prod[3] <== t3 + carry2 - carry3 * FP_BASE;
+    prod[0] <== t0 - carry0 * base;
+    prod[1] <== t1 + carry0 - carry1 * base;
+    prod[2] <== t2 + carry1 - carry2 * base;
+    prod[3] <== t3 + carry2 - carry3 * base;
     prod[4] <== t4 + carry3;
 
     component prod0Bits = Num2Bits(120);
@@ -336,21 +351,21 @@ template FpMul() {
     signal qt2;
     signal qt3;
     signal qt4;
-    qt0 <== q[0] * FP_MOD_L0;
-    qt1 <== q[0] * FP_MOD_L1 + q[1] * FP_MOD_L0;
-    qt2 <== q[0] * FP_MOD_L2 + q[1] * FP_MOD_L1 + q[2] * FP_MOD_L0;
-    qt3 <== q[1] * FP_MOD_L2 + q[2] * FP_MOD_L1;
-    qt4 <== q[2] * FP_MOD_L2;
+    qt0 <== q[0] * mod0;
+    qt1 <== q[0] * mod1 + q[1] * mod0;
+    qt2 <== q[0] * mod2 + q[1] * mod1 + q[2] * mod0;
+    qt3 <== q[1] * mod2 + q[2] * mod1;
+    qt4 <== q[2] * mod2;
 
     signal qmod[5];
     signal qcarry0;
     signal qcarry1;
     signal qcarry2;
     signal qcarry3;
-    qmod[0] <== qt0 - qcarry0 * FP_BASE;
-    qmod[1] <== qt1 + qcarry0 - qcarry1 * FP_BASE;
-    qmod[2] <== qt2 + qcarry1 - qcarry2 * FP_BASE;
-    qmod[3] <== qt3 + qcarry2 - qcarry3 * FP_BASE;
+    qmod[0] <== qt0 - qcarry0 * base;
+    qmod[1] <== qt1 + qcarry0 - qcarry1 * base;
+    qmod[2] <== qt2 + qcarry1 - qcarry2 * base;
+    qmod[3] <== qt3 + qcarry2 - qcarry3 * base;
     qmod[4] <== qt4 + qcarry3;
 
     component qmod0Bits = Num2Bits(120);
@@ -382,10 +397,10 @@ template FpMul() {
     addc2 * (addc2 - 1) === 0;
     addc3 * (addc3 - 1) === 0;
 
-    qmod[0] + out[0] - prod[0] - addc0 * FP_BASE === 0;
-    qmod[1] + out[1] + addc0 - prod[1] - addc1 * FP_BASE === 0;
-    qmod[2] + out[2] + addc1 - prod[2] - addc2 * FP_BASE === 0;
-    qmod[3] + addc2 - prod[3] - addc3 * FP_BASE === 0;
+    qmod[0] + out[0] - prod[0] - addc0 * base === 0;
+    qmod[1] + out[1] + addc0 - prod[1] - addc1 * base === 0;
+    qmod[2] + out[2] + addc1 - prod[2] - addc2 * base === 0;
+    qmod[3] + addc2 - prod[3] - addc3 * base === 0;
     qmod[4] + addc3 - prod[4] === 0;
 
     component outCheck = FpRangeCheck();
@@ -397,9 +412,9 @@ template FpMul() {
     lt.a[0] <== out[0];
     lt.a[1] <== out[1];
     lt.a[2] <== out[2];
-    lt.b[0] <== FP_MOD_L0;
-    lt.b[1] <== FP_MOD_L1;
-    lt.b[2] <== FP_MOD_L2;
+    lt.b[0] <== mod0;
+    lt.b[1] <== mod1;
+    lt.b[2] <== mod2;
     lt.out === 1;
 }
 
