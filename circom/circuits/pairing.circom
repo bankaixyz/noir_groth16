@@ -134,18 +134,24 @@ template PairingMul034By034() {
         for (var j4 = 0; j4 < 3; j4++) {
             x04_sub1.a[i4][j4] <== x04_mul.out[i4][j4];
             x04_sub1.b[i4][j4] <== x0.out[i4][j4];
-            x04.a[i4][j4] <== x04_sub1.out[i4][j4];
-            x04.b[i4][j4] <== x4.out[i4][j4];
 
             x03_sub1.a[i4][j4] <== x03_mul.out[i4][j4];
             x03_sub1.b[i4][j4] <== x0.out[i4][j4];
-            x03.a[i4][j4] <== x03_sub1.out[i4][j4];
-            x03.b[i4][j4] <== x3.out[i4][j4];
 
             x34_sub1.a[i4][j4] <== x34_mul.out[i4][j4];
             x34_sub1.b[i4][j4] <== x3.out[i4][j4];
-            x34.a[i4][j4] <== x34_sub1.out[i4][j4];
-            x34.b[i4][j4] <== x4.out[i4][j4];
+        }
+    }
+    for (var i4b = 0; i4b < 2; i4b++) {
+        for (var j4b = 0; j4b < 3; j4b++) {
+            x04.a[i4b][j4b] <== x04_sub1.out[i4b][j4b];
+            x04.b[i4b][j4b] <== x4.out[i4b][j4b];
+
+            x03.a[i4b][j4b] <== x03_sub1.out[i4b][j4b];
+            x03.b[i4b][j4b] <== x3.out[i4b][j4b];
+
+            x34.a[i4b][j4b] <== x34_sub1.out[i4b][j4b];
+            x34.b[i4b][j4b] <== x4.out[i4b][j4b];
         }
     }
 
