@@ -512,42 +512,16 @@ template Fp2MulByNonResidue() {
     signal input a[2][3];
     signal output out[2][3];
 
-    component two_a0 = FpDouble();
-    component four_a0 = FpDouble();
-    component eight_a0 = FpDouble();
-    component nine_a0 = FpAdd();
-    for (var i = 0; i < 3; i++) {
-        two_a0.a[i] <== a[0][i];
-        four_a0.a[i] <== two_a0.out[i];
-        eight_a0.a[i] <== four_a0.out[i];
-        nine_a0.a[i] <== eight_a0.out[i];
-        nine_a0.b[i] <== a[0][i];
+    component mul = Fp2MulByConst(9, 0, 0, 1, 0, 0);
+    for (var i = 0; i < 2; i++) {
+        for (var j = 0; j < 3; j++) {
+            mul.a[i][j] <== a[i][j];
+        }
     }
-
-    component two_a1 = FpDouble();
-    component four_a1 = FpDouble();
-    component eight_a1 = FpDouble();
-    component nine_a1 = FpAdd();
-    for (var i = 0; i < 3; i++) {
-        two_a1.a[i] <== a[1][i];
-        four_a1.a[i] <== two_a1.out[i];
-        eight_a1.a[i] <== four_a1.out[i];
-        nine_a1.a[i] <== eight_a1.out[i];
-        nine_a1.b[i] <== a[1][i];
-    }
-
-    component c0 = FpSub();
-    component c1 = FpAdd();
-    for (var i = 0; i < 3; i++) {
-        c0.a[i] <== nine_a0.out[i];
-        c0.b[i] <== a[1][i];
-        c1.a[i] <== a[0][i];
-        c1.b[i] <== nine_a1.out[i];
-    }
-
-    for (var i = 0; i < 3; i++) {
-        out[0][i] <== c0.out[i];
-        out[1][i] <== c1.out[i];
+    for (var i2 = 0; i2 < 2; i2++) {
+        for (var j2 = 0; j2 < 3; j2++) {
+            out[i2][j2] <== mul.out[i2][j2];
+        }
     }
 }
 
@@ -600,7 +574,11 @@ template Fp2MulByBTwistCoeff() {
     for (var i = 0; i < 2; i++) {
         for (var j = 0; j < 3; j++) {
             mul.a[i][j] <== a[i][j];
-            out[i][j] <== mul.out[i][j];
+        }
+    }
+    for (var i2 = 0; i2 < 2; i2++) {
+        for (var j2 = 0; j2 < 3; j2++) {
+            out[i2][j2] <== mul.out[i2][j2];
         }
     }
 }
@@ -616,7 +594,11 @@ template Fp2MulByNonResidue1Power1() {
     for (var i = 0; i < 2; i++) {
         for (var j = 0; j < 3; j++) {
             mul.a[i][j] <== a[i][j];
-            out[i][j] <== mul.out[i][j];
+        }
+    }
+    for (var i2 = 0; i2 < 2; i2++) {
+        for (var j2 = 0; j2 < 3; j2++) {
+            out[i2][j2] <== mul.out[i2][j2];
         }
     }
 }
@@ -632,7 +614,11 @@ template Fp2MulByNonResidue1Power2() {
     for (var i = 0; i < 2; i++) {
         for (var j = 0; j < 3; j++) {
             mul.a[i][j] <== a[i][j];
-            out[i][j] <== mul.out[i][j];
+        }
+    }
+    for (var i2 = 0; i2 < 2; i2++) {
+        for (var j2 = 0; j2 < 3; j2++) {
+            out[i2][j2] <== mul.out[i2][j2];
         }
     }
 }
@@ -648,7 +634,11 @@ template Fp2MulByNonResidue1Power3() {
     for (var i = 0; i < 2; i++) {
         for (var j = 0; j < 3; j++) {
             mul.a[i][j] <== a[i][j];
-            out[i][j] <== mul.out[i][j];
+        }
+    }
+    for (var i2 = 0; i2 < 2; i2++) {
+        for (var j2 = 0; j2 < 3; j2++) {
+            out[i2][j2] <== mul.out[i2][j2];
         }
     }
 }
@@ -664,7 +654,11 @@ template Fp2MulByNonResidue1Power4() {
     for (var i = 0; i < 2; i++) {
         for (var j = 0; j < 3; j++) {
             mul.a[i][j] <== a[i][j];
-            out[i][j] <== mul.out[i][j];
+        }
+    }
+    for (var i2 = 0; i2 < 2; i2++) {
+        for (var j2 = 0; j2 < 3; j2++) {
+            out[i2][j2] <== mul.out[i2][j2];
         }
     }
 }
@@ -680,7 +674,11 @@ template Fp2MulByNonResidue1Power5() {
     for (var i = 0; i < 2; i++) {
         for (var j = 0; j < 3; j++) {
             mul.a[i][j] <== a[i][j];
-            out[i][j] <== mul.out[i][j];
+        }
+    }
+    for (var i2 = 0; i2 < 2; i2++) {
+        for (var j2 = 0; j2 < 3; j2++) {
+            out[i2][j2] <== mul.out[i2][j2];
         }
     }
 }
@@ -801,7 +799,11 @@ template Fp2MulByNonResidue3Power1() {
     for (var i = 0; i < 2; i++) {
         for (var j = 0; j < 3; j++) {
             mul.a[i][j] <== a[i][j];
-            out[i][j] <== mul.out[i][j];
+        }
+    }
+    for (var i2 = 0; i2 < 2; i2++) {
+        for (var j2 = 0; j2 < 3; j2++) {
+            out[i2][j2] <== mul.out[i2][j2];
         }
     }
 }
@@ -817,7 +819,11 @@ template Fp2MulByNonResidue3Power2() {
     for (var i = 0; i < 2; i++) {
         for (var j = 0; j < 3; j++) {
             mul.a[i][j] <== a[i][j];
-            out[i][j] <== mul.out[i][j];
+        }
+    }
+    for (var i2 = 0; i2 < 2; i2++) {
+        for (var j2 = 0; j2 < 3; j2++) {
+            out[i2][j2] <== mul.out[i2][j2];
         }
     }
 }
@@ -833,7 +839,11 @@ template Fp2MulByNonResidue3Power3() {
     for (var i = 0; i < 2; i++) {
         for (var j = 0; j < 3; j++) {
             mul.a[i][j] <== a[i][j];
-            out[i][j] <== mul.out[i][j];
+        }
+    }
+    for (var i2 = 0; i2 < 2; i2++) {
+        for (var j2 = 0; j2 < 3; j2++) {
+            out[i2][j2] <== mul.out[i2][j2];
         }
     }
 }
@@ -849,7 +859,11 @@ template Fp2MulByNonResidue3Power4() {
     for (var i = 0; i < 2; i++) {
         for (var j = 0; j < 3; j++) {
             mul.a[i][j] <== a[i][j];
-            out[i][j] <== mul.out[i][j];
+        }
+    }
+    for (var i2 = 0; i2 < 2; i2++) {
+        for (var j2 = 0; j2 < 3; j2++) {
+            out[i2][j2] <== mul.out[i2][j2];
         }
     }
 }
@@ -865,7 +879,11 @@ template Fp2MulByNonResidue3Power5() {
     for (var i = 0; i < 2; i++) {
         for (var j = 0; j < 3; j++) {
             mul.a[i][j] <== a[i][j];
-            out[i][j] <== mul.out[i][j];
+        }
+    }
+    for (var i2 = 0; i2 < 2; i2++) {
+        for (var j2 = 0; j2 < 3; j2++) {
+            out[i2][j2] <== mul.out[i2][j2];
         }
     }
 }

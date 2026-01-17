@@ -271,7 +271,8 @@ template FpInv() {
     }
 
     signal inv;
-    inv <== 1 / aVal.out;
+    inv <-- 1 / aVal.out;
+    inv * aVal.out === 1;
 
     component outLimbs = FpToLimbs();
     outLimbs.in <== inv;
@@ -292,8 +293,11 @@ template FpDiv() {
         bVal.in[i] <== b[i];
     }
 
+    signal inv;
+    inv <-- 1 / bVal.out;
+    inv * bVal.out === 1;
     signal quot;
-    quot <== aVal.out / bVal.out;
+    quot <== aVal.out * inv;
 
     component outLimbs = FpToLimbs();
     outLimbs.in <== quot;

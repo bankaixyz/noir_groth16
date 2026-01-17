@@ -218,8 +218,12 @@ template Fp6Mul() {
         for (var j = 0; j < 3; j++) {
             c0_sub1.a[i][j] <== c0_mul.out[i][j];
             c0_sub1.b[i][j] <== t1.out[i][j];
-            c0_sub2.a[i][j] <== c0_sub1.out[i][j];
-            c0_sub2.b[i][j] <== t2.out[i][j];
+        }
+    }
+    for (var i2 = 0; i2 < 2; i2++) {
+        for (var j2 = 0; j2 < 3; j2++) {
+            c0_sub2.a[i2][j2] <== c0_sub1.out[i2][j2];
+            c0_sub2.b[i2][j2] <== t2.out[i2][j2];
         }
     }
 
@@ -263,8 +267,12 @@ template Fp6Mul() {
         for (var j = 0; j < 3; j++) {
             c1_sub1.a[i][j] <== c1_mul.out[i][j];
             c1_sub1.b[i][j] <== t0.out[i][j];
-            c1_sub2.a[i][j] <== c1_sub1.out[i][j];
-            c1_sub2.b[i][j] <== t1.out[i][j];
+        }
+    }
+    for (var i3 = 0; i3 < 2; i3++) {
+        for (var j3 = 0; j3 < 3; j3++) {
+            c1_sub2.a[i3][j3] <== c1_sub1.out[i3][j3];
+            c1_sub2.b[i3][j3] <== t1.out[i3][j3];
         }
     }
 
@@ -308,8 +316,12 @@ template Fp6Mul() {
         for (var j = 0; j < 3; j++) {
             c2_sub1.a[i][j] <== c2_mul.out[i][j];
             c2_sub1.b[i][j] <== t0.out[i][j];
-            c2_sub2.a[i][j] <== c2_sub1.out[i][j];
-            c2_sub2.b[i][j] <== t2.out[i][j];
+        }
+    }
+    for (var i4 = 0; i4 < 2; i4++) {
+        for (var j4 = 0; j4 < 3; j4++) {
+            c2_sub2.a[i4][j4] <== c2_sub1.out[i4][j4];
+            c2_sub2.b[i4][j4] <== t2.out[i4][j4];
         }
     }
 
@@ -390,8 +402,12 @@ template Fp6Square() {
         for (var j = 0; j < 3; j++) {
             c4_tmp1.a[i][j] <== a[0][i][j];
             c4_tmp1.b[i][j] <== a[1][i][j];
-            c4_tmp2.a[i][j] <== c4_tmp1.out[i][j];
-            c4_tmp2.b[i][j] <== a[2][i][j];
+        }
+    }
+    for (var i2 = 0; i2 < 2; i2++) {
+        for (var j2 = 0; j2 < 3; j2++) {
+            c4_tmp2.a[i2][j2] <== c4_tmp1.out[i2][j2];
+            c4_tmp2.b[i2][j2] <== a[2][i2][j2];
         }
     }
     component c4_sq = Fp2Square();
@@ -436,10 +452,18 @@ template Fp6Square() {
         for (var j = 0; j < 3; j++) {
             b2_tmp1.a[i][j] <== c2.out[i][j];
             b2_tmp1.b[i][j] <== c4_sq.out[i][j];
-            b2_tmp2.a[i][j] <== b2_tmp1.out[i][j];
-            b2_tmp2.b[i][j] <== c5_dbl.out[i][j];
-            b2.a[i][j] <== b2_tmp2.out[i][j];
-            b2.b[i][j] <== c3.out[i][j];
+        }
+    }
+    for (var i2 = 0; i2 < 2; i2++) {
+        for (var j2 = 0; j2 < 3; j2++) {
+            b2_tmp2.a[i2][j2] <== b2_tmp1.out[i2][j2];
+            b2_tmp2.b[i2][j2] <== c5_dbl.out[i2][j2];
+        }
+    }
+    for (var i3 = 0; i3 < 2; i3++) {
+        for (var j3 = 0; j3 < 3; j3++) {
+            b2.a[i3][j3] <== b2_tmp2.out[i3][j3];
+            b2.b[i3][j3] <== c3.out[i3][j3];
         }
     }
 
@@ -693,8 +717,12 @@ template Fp6MulBy01() {
         for (var j = 0; j < 3; j++) {
             t1_sub1.a[i][j] <== t1_mul.out[i][j];
             t1_sub1.b[i][j] <== a_mul.out[i][j];
-            t1_sub2.a[i][j] <== t1_sub1.out[i][j];
-            t1_sub2.b[i][j] <== b_mul.out[i][j];
+        }
+    }
+    for (var i2 = 0; i2 < 2; i2++) {
+        for (var j2 = 0; j2 < 3; j2++) {
+            t1_sub2.a[i2][j2] <== t1_sub1.out[i2][j2];
+            t1_sub2.b[i2][j2] <== b_mul.out[i2][j2];
         }
     }
 
@@ -819,8 +847,12 @@ template Fp6MulBy12() {
         for (var j = 0; j < 3; j++) {
             c0_sub1.a[i][j] <== c0_mul.out[i][j];
             c0_sub1.b[i][j] <== t1.out[i][j];
-            c0_sub2.a[i][j] <== c0_sub1.out[i][j];
-            c0_sub2.b[i][j] <== t2.out[i][j];
+        }
+    }
+    for (var i2 = 0; i2 < 2; i2++) {
+        for (var j2 = 0; j2 < 3; j2++) {
+            c0_sub2.a[i2][j2] <== c0_sub1.out[i2][j2];
+            c0_sub2.b[i2][j2] <== t2.out[i2][j2];
         }
     }
     component c0_nr = Fp2MulByNonResidue();
@@ -885,8 +917,12 @@ template Fp6MulBy12() {
         for (var j = 0; j < 3; j++) {
             c2_sub.a[i][j] <== c2_mul.out[i][j];
             c2_sub.b[i][j] <== t2.out[i][j];
-            c2.a[i][j] <== c2_sub.out[i][j];
-            c2.b[i][j] <== t1.out[i][j];
+        }
+    }
+    for (var i2 = 0; i2 < 2; i2++) {
+        for (var j2 = 0; j2 < 3; j2++) {
+            c2.a[i2][j2] <== c2_sub.out[i2][j2];
+            c2.b[i2][j2] <== t1.out[i2][j2];
         }
     }
 
