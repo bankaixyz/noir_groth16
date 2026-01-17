@@ -504,13 +504,29 @@ template FpMul() {
     r4NonZero <-- r4Approx == 0 ? 0 : 1;
     bigFlag <-- (r3NonZero + r4NonZero) > 0 ? 1 : 0;
 
+    signal gt2;
+    signal eq2;
+    signal gt1;
+    signal eq1;
+    signal gt0;
+    signal eq0;
+    gt2 <-- r2Approx > mod2 ? 1 : 0;
+    eq2 <-- r2Approx == mod2 ? 1 : 0;
+    gt1 <-- r1Approx > mod1 ? 1 : 0;
+    eq1 <-- r1Approx == mod1 ? 1 : 0;
+    gt0 <-- r0Approx > mod0 ? 1 : 0;
+    eq0 <-- r0Approx == mod0 ? 1 : 0;
+
+    signal ge0;
+    signal eq1Ge0;
+    signal ge1;
+    signal eq2Ge1;
     signal geFlag;
-    geFlag <-- (r2Approx > mod2) ? 1 :
-        (r2Approx < mod2) ? 0 :
-        (r1Approx > mod1) ? 1 :
-        (r1Approx < mod1) ? 0 :
-        (r0Approx > mod0) ? 1 :
-        (r0Approx == mod0) ? 1 : 0;
+    ge0 <-- gt0 + eq0 - gt0 * eq0;
+    eq1Ge0 <-- eq1 * ge0;
+    ge1 <-- gt1 + eq1Ge0 - gt1 * eq1Ge0;
+    eq2Ge1 <-- eq2 * ge1;
+    geFlag <-- gt2 + eq2Ge1 - gt2 * eq2Ge1;
 
     signal needsSub;
     needsSub <-- (bigFlag == 1) ? 1 : geFlag;
