@@ -1,6 +1,6 @@
 use crate::types::Proof;
 use crate::verify::verify_sp1_fast;
-use crate::config::{sp1_vk, sp1_ic1_plus_ic2};
+use crate::config::sp1::{sp1_msm2_w3_table, sp1_vk};
 use noir_bn254_pairing::fp::Fp;
 use noir_bn254_pairing::fp2::Fp2;
 use noir_bn254_pairing::g1::G1Affine;
@@ -54,7 +54,7 @@ pub fn verify_sp1<let N: u32>(
     proof: Proof,
 ) -> bool {
     let public_inputs = sp1_public_inputs(vkey, public_values);
-    verify_sp1_fast(sp1_vk(), proof, public_inputs, sp1_ic1_plus_ic2())
+    verify_sp1_fast(sp1_vk(), proof, public_inputs, sp1_msm2_w3_table())
 }
 
 fn fp_from_limbs(l0: u128, l1: u128, l2: u128) -> Fp {
