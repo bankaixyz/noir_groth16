@@ -1,9 +1,9 @@
 const path = require("path");
 const wasm_tester = require("circom_tester").wasm;
 const { expect } = require("chai");
-const { mod, limbsToBigInt, fpInv } = require("./field");
+const { mod, limbsToBigInt, bigIntToLimbs, fpInv } = require("./field");
 
-const fp = (arr) => limbsToBigInt(arr.map((v) => BigInt(v)));
+const fp = (arr) => arr.map((v) => BigInt(v));
 const g1 = (x, y) => [fp(x), fp(y)];
 
 const generator = g1(["0x1", "0x0", "0x0"], ["0x2", "0x0", "0x0"]);
@@ -29,24 +29,34 @@ const pointANegated = g1(
 );
 const infinity = g1(["0x0", "0x0", "0x0"], ["0x0", "0x0", "0x0"]);
 
-const generatorJac = [fp(["0x1", "0x0", "0x0"]), fp(["0x2", "0x0", "0x0"]), fp(["0x1", "0x0", "0x0"])];
+const generatorJac = [
+    fp(["0x1", "0x0", "0x0"]),
+    fp(["0x2", "0x0", "0x0"]),
+    fp(["0x1", "0x0", "0x0"]),
+];
 const generatorJacFuzzed = [
     fp(["0x121", "0x0", "0x0"]),
     fp(["0x2662", "0x0", "0x0"]),
     fp(["0x11", "0x0", "0x0"]),
 ];
-const infinityJac = [fp(["0x1", "0x0", "0x0"]), fp(["0x1", "0x0", "0x0"]), fp(["0x0", "0x0", "0x0"])];
+const infinityJac = [
+    fp(["0x1", "0x0", "0x0"]),
+    fp(["0x1", "0x0", "0x0"]),
+    fp(["0x0", "0x0", "0x0"]),
+];
+
+const fpInvLimbs = (limbs) => bigIntToLimbs(fpInv(limbsToBigInt(limbs)));
 
 const jacobianToAffine = (p) => {
-    const z = p[2];
+    const z = limbsToBigInt(p[2]);
     if (z === 0n) {
         return infinity;
     }
     const inv = fpInv(z);
     const invSq = mod(inv * inv);
-    const x = mod(p[0] * invSq);
-    const y = mod(p[1] * invSq * inv);
-    return [x, y];
+    const x = mod(limbsToBigInt(p[0]) * invSq);
+    const y = mod(limbsToBigInt(p[1]) * invSq * inv);
+    return [bigIntToLimbs(x), bigIntToLimbs(y)];
 };
 
 describe("G1 operations", function () {
@@ -60,9 +70,9 @@ describe("G1 operations", function () {
             path.join(__dirname, "../circuits/test/g1_ops.circom")
         );
 
-        const h = mod(pointB[0] - pointA[0]);
+        const h = mod(limbsToBigInt(pointB[0]) - limbsToBigInt(pointA[0]));
         const zAdd = mod(2n * h);
-        const zDouble = mod(2n * pointA[1]);
+        const zDouble = mod(2n * limbsToBigInt(pointA[1]));
 
         witness = await circuit.calculateWitness(
             {
@@ -70,11 +80,14 @@ describe("G1 operations", function () {
                 b: pointB,
                 neg_a: pointANegated,
                 gen: generator,
-                bad: [generator[0], mod(generator[1] * 2n)],
-                inv_add_ab: fpInv(zAdd),
-                inv_double_a: fpInv(zDouble),
-                inv_jac_fuzzed: fpInv(generatorJacFuzzed[2]),
-                inv_jac_inf: 0n,
+                bad: [
+                    generator[0],
+                    bigIntToLimbs(mod(limbsToBigInt(generator[1]) * 2n)),
+                ],
+                inv_add_ab: bigIntToLimbs(fpInv(zAdd)),
+                inv_double_a: bigIntToLimbs(fpInv(zDouble)),
+                inv_jac_fuzzed: fpInvLimbs(generatorJacFuzzed[2]),
+                inv_jac_inf: [0n, 0n, 0n],
                 jac_p: generatorJac,
                 jac_q: generatorJacFuzzed,
                 jac_inf: infinityJac,
@@ -103,13 +116,13 @@ describe("G1 operations", function () {
 
     it("matches jacobian arithmetic expectations", async function () {
         const outputs = await circuit.getOutput(witness, {
-            jac_sum: [3, 1],
-            jac_dbl: [3, 1],
-            jac_sum_neg: [3, 1],
-            jac_add_inf1: [3, 1],
-            jac_add_inf2: [3, 1],
-            jac_fuzzed_affine: [2, 1],
-            jac_inf_affine: [2, 1],
+            jac_sum: [3, [3, 1]],
+            jac_dbl: [3, [3, 1]],
+            jac_sum_neg: [3, [3, 1]],
+            jac_add_inf1: [3, [3, 1]],
+            jac_add_inf2: [3, [3, 1]],
+            jac_fuzzed_affine: [2, [3, 1]],
+            jac_inf_affine: [2, [3, 1]],
         });
 
         const sumAff = jacobianToAffine(outputs.jac_sum);
