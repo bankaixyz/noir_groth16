@@ -74,12 +74,18 @@ template Fp2Ops() {
     for (var i3 = 0; i3 < 2; i3++) {
         for (var j4 = 0; j4 < 3; j4++) {
             mul_elem.a[i3][j4] <== a[i3][j4];
-            mul_elem_inv.a[i3][j4] <== mul_elem.out[i3][j4];
         }
     }
     for (var j5 = 0; j5 < 3; j5++) {
         mul_elem.element[j5] <== a[0][j5];
-        mul_elem_inv.element[j5] <== inv_elem.out[j5];
+    }
+    for (var i4 = 0; i4 < 2; i4++) {
+        for (var j6 = 0; j6 < 3; j6++) {
+            mul_elem_inv.a[i4][j6] <== mul_elem.out[i4][j6];
+        }
+    }
+    for (var j7 = 0; j7 < 3; j7++) {
+        mul_elem_inv.element[j7] <== inv_elem.out[j7];
     }
 
     for (var i4 = 0; i4 < 2; i4++) {

@@ -80,14 +80,24 @@ template Fp6Ops() {
         for (var i4 = 0; i4 < 2; i4++) {
             for (var j4 = 0; j4 < 3; j4++) {
                 mul_e2.a[k2][i4][j4] <== a[k2][i4][j4];
-                mul_e2_inv.a[k2][i4][j4] <== mul_e2.out[k2][i4][j4];
             }
         }
     }
     for (var i5 = 0; i5 < 2; i5++) {
         for (var j5 = 0; j5 < 3; j5++) {
             mul_e2.c0[i5][j5] <== c0[i5][j5];
-            mul_e2_inv.c0[i5][j5] <== c0_inv.out[i5][j5];
+        }
+    }
+    for (var k3 = 0; k3 < 3; k3++) {
+        for (var i6 = 0; i6 < 2; i6++) {
+            for (var j6 = 0; j6 < 3; j6++) {
+                mul_e2_inv.a[k3][i6][j6] <== mul_e2.out[k3][i6][j6];
+            }
+        }
+    }
+    for (var i7 = 0; i7 < 2; i7++) {
+        for (var j7 = 0; j7 < 3; j7++) {
+            mul_e2_inv.c0[i7][j7] <== c0_inv.out[i7][j7];
         }
     }
 

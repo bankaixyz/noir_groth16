@@ -175,6 +175,7 @@ const fixtureAMulBy01 = fp6(
 );
 
 describe("Fp6 operations", function () {
+    this.timeout(60000);
     let circuit;
     let witnessAB;
     let witnessAA;

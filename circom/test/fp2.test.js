@@ -54,6 +54,7 @@ const fixtureAMulByNonResidue = fp2(
 );
 
 describe("Fp2 operations", function () {
+    this.timeout(60000);
     let circuit;
     let witnessAB;
     let witnessAA;

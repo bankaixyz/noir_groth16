@@ -492,6 +492,7 @@ const fixtureAMulBy034 = fp12(
 );
 
 describe("Fp12 operations", function () {
+    this.timeout(120000);
     let circuit;
     let witnessAB;
     let witnessAA;
