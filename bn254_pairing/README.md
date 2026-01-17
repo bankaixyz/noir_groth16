@@ -1,27 +1,51 @@
 # BN254 Pairing in Noir
 
-## Groth16 Verifier Optimization Notes
+This package implements the BN254 pairing in Noir. It includes finite field arithmetic,
+G1/G2 operations, the Miller loop, and the final exponentiation.
 
-For SP1 Groth16 verification, we now use a 3-bit joint-window MSM (w=3) with
-precomputed `ic` combinations. This reduces the number of expensive G1 additions
-needed to compute L (the public-input linear combination), cutting overall
-constraints compared to the naive double-and-add per input.
+## Main API
 
+Core pairing entrypoints:
 
-## Performance Notes
+- `pairing(p: G1Affine, q: G2Affine) -> Fp12`
+- `pairing_multi(p: [G1Affine; N], q: [G2Affine; N]) -> Fp12`
+- `miller_loop(p: [G1Affine; N], q: [G2Affine; N]) -> Fp12`
+- `final_exponentiation(z: Fp12) -> Fp12`
 
-2 pairings:
-constraints: 1812974
-ACIR opcodes: 8196
-proving time: 15.38s
+Curve helpers you can `assert` against in your circuit:
 
-3 pairings: 
-constraints: 2035715
-ACIR opcodes: 8196
-proving time: 16s
+- `is_on_curve_g1_affine`, `is_on_curve_g2_affine`
+- `g1_affine_infinity`, `g2_affine_infinity`, `neg_g1_affine`, `neg_g2_affine`
+- `add_g1_affine`, `add_g1_jac`, `add_g1_jac_mixed`, `double_g1_jac`
+- `add_g2_jac`, `double_g2_jac`, `projective_from_affine_g2`
 
-4 pairing:
-constraints: 2227841 
-ACIR opcodes: 8912
-proving time: 16.7s
+## Algorithm overview
+
+- **Miller loop**: evaluates line functions from repeated `double_step` and
+  `add_mixed_step` updates on G2, then multiplies sparse line evaluations in Fp12.
+- **Final exponentiation**: easy part uses inverse + Frobenius; hard part uses
+  cyclotomic squaring and the `expt()` chain for the BN254 curve parameter.
+
+## Optimization notes
+
+The implementation uses several circuit-friendly optimizations:
+
+- **Pair filtering**: `filter_pairs` removes infinity inputs to skip work.
+- **Sparse line arithmetic**: line evaluations are handled via `mul_by_034`,
+  `mul_034_by_034`, and `mul_by_01234` to avoid full Fp12 multiplies.
+- **Mixed additions on G2**: `double_step` and `add_mixed_step` avoid affine inversion
+  costs and keep line evaluations cheap.
+- **Frobenius shortcuts**: final exponentiation uses `frobenius`, `frobenius_square`,
+  and `cyclotomic_square` for cheaper field ops.
+
+## Performance notes
+
+These figures are measured in a Noir circuit and are intended as rough guidance.
+Some tests are slow.
+
+| Pairings | Constraints | ACIR opcodes | Proving time |
+| --- | --- | --- | --- |
+| 2 | 1,812,974 | 8,196 | 15.38s |
+| 3 | 2,035,715 | 8,196 | 16.0s |
+| 4 | 2,227,841 | 8,912 | 16.7s |
 
