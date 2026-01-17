@@ -164,8 +164,12 @@ template G2NegAffine() {
     for (var i = 0; i < 2; i++) {
         for (var j = 0; j < 3; j++) {
             neg.a[i][j] <== p[1][i][j];
-            out[0][i][j] <== p[0][i][j];
-            out[1][i][j] <== neg.out[i][j];
+        }
+    }
+    for (var i2 = 0; i2 < 2; i2++) {
+        for (var j2 = 0; j2 < 3; j2++) {
+            out[0][i2][j2] <== p[0][i2][j2];
+            out[1][i2][j2] <== neg.out[i2][j2];
         }
     }
 }
