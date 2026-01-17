@@ -59,68 +59,37 @@ template PairingOps() {
         }
     }
 
-    component pairing_single = PairingSingle();
-    for (var j7 = 0; j7 < 3; j7++) {
-        pairing_single.p[0][j7] <== g1_gen[0][j7];
-        pairing_single.p[1][j7] <== g1_gen[1][j7];
-    }
-    for (var i5 = 0; i5 < 2; i5++) {
-        for (var j8 = 0; j8 < 3; j8++) {
-            pairing_single.q[0][i5][j8] <== g2_gen[0][i5][j8];
-            pairing_single.q[1][i5][j8] <== g2_gen[1][i5][j8];
-        }
-    }
+    component pairing_single = PairingFinalExponentiation();
     for (var c = 0; c < 2; c++) {
         for (var b = 0; b < 3; b++) {
             for (var i6 = 0; i6 < 2; i6++) {
                 for (var j9 = 0; j9 < 3; j9++) {
-                    pairing_single.inv_miller[c][b][i6][j9] <== inv_miller_gen[c][b][i6][j9];
+                    pairing_single.z[c][b][i6][j9] <== miller_single.out[c][b][i6][j9];
+                    pairing_single.inv_z[c][b][i6][j9] <== inv_miller_gen[c][b][i6][j9];
                 }
             }
         }
     }
 
-    component pairing_2g1_single = PairingSingle();
-    for (var j10 = 0; j10 < 3; j10++) {
-        pairing_2g1_single.p[0][j10] <== g1_2g1[0][j10];
-        pairing_2g1_single.p[1][j10] <== g1_2g1[1][j10];
-    }
-    for (var i7 = 0; i7 < 2; i7++) {
-        for (var j11 = 0; j11 < 3; j11++) {
-            pairing_2g1_single.q[0][i7][j11] <== g2_gen[0][i7][j11];
-            pairing_2g1_single.q[1][i7][j11] <== g2_gen[1][i7][j11];
-        }
-    }
+    component pairing_2g1_single = PairingFinalExponentiation();
     for (var c2 = 0; c2 < 2; c2++) {
         for (var b2 = 0; b2 < 3; b2++) {
             for (var i8 = 0; i8 < 2; i8++) {
                 for (var j12 = 0; j12 < 3; j12++) {
-                    pairing_2g1_single.inv_miller[c2][b2][i8][j12] <== inv_miller_2g1[c2][b2][i8][j12];
+                    pairing_2g1_single.z[c2][b2][i8][j12] <== miller_2g1_calc.out[c2][b2][i8][j12];
+                    pairing_2g1_single.inv_z[c2][b2][i8][j12] <== inv_miller_2g1[c2][b2][i8][j12];
                 }
             }
         }
     }
 
-    component pairing_multi_2 = PairingMulti(2);
-    for (var j13 = 0; j13 < 3; j13++) {
-        pairing_multi_2.p[0][0][j13] <== g1_gen[0][j13];
-        pairing_multi_2.p[0][1][j13] <== g1_gen[1][j13];
-        pairing_multi_2.p[1][0][j13] <== g1_2g1[0][j13];
-        pairing_multi_2.p[1][1][j13] <== g1_2g1[1][j13];
-    }
-    for (var i9 = 0; i9 < 2; i9++) {
-        for (var j14 = 0; j14 < 3; j14++) {
-            pairing_multi_2.q[0][0][i9][j14] <== g2_gen[0][i9][j14];
-            pairing_multi_2.q[0][1][i9][j14] <== g2_gen[1][i9][j14];
-            pairing_multi_2.q[1][0][i9][j14] <== g2_3g2[0][i9][j14];
-            pairing_multi_2.q[1][1][i9][j14] <== g2_3g2[1][i9][j14];
-        }
-    }
+    component pairing_multi_2 = PairingFinalExponentiation();
     for (var c3 = 0; c3 < 2; c3++) {
         for (var b3 = 0; b3 < 3; b3++) {
             for (var i10 = 0; i10 < 2; i10++) {
                 for (var j15 = 0; j15 < 3; j15++) {
-                    pairing_multi_2.inv_miller[c3][b3][i10][j15] <== inv_miller_multi[c3][b3][i10][j15];
+                    pairing_multi_2.z[c3][b3][i10][j15] <== miller_multi_2.out[c3][b3][i10][j15];
+                    pairing_multi_2.inv_z[c3][b3][i10][j15] <== inv_miller_multi[c3][b3][i10][j15];
                 }
             }
         }
