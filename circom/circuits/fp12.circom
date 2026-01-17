@@ -57,11 +57,13 @@ template Fp12IsOne() {
         }
     }
 
-    var acc = 1;
-    for (var k = 0; k < 36; k++) {
-        acc *= eqs[k].out;
+    signal acc[36];
+    acc[0] <== eqs[0].out;
+    for (var k = 1; k < 36; k++) {
+        acc[k] <== acc[k - 1] * eqs[k].out;
     }
-    out <== acc;
+    out <== acc[35];
+    out * (out - 1) === 0;
 }
 
 template Fp12Add() {
