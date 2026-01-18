@@ -7,6 +7,49 @@ This repo contains two Noir libraries:
 
 Tests are slow; the fastest sanity check is in the Groth16 verifier.
 
+## Environment setup
+
+This repo targets **Noir `>= 0.33.0`** (see `compiler_version` in each package’s `Nargo.toml`).
+
+### Install Noir (nargo)
+
+Recommended install method is `noirup`:
+
+```bash
+curl -L https://raw.githubusercontent.com/noir-lang/noirup/main/install | bash
+noirup
+nargo --version
+```
+
+If your `nargo` is older than `0.33.0`, use `noirup` to switch to a newer Noir version (see `noirup --help`), then re-check `nargo --version`.
+
+### Compile / execute / prove (example circuits)
+
+First runs will fetch git dependencies (e.g. `noir-bignum`, `sha256`) automatically.
+
+`pairing_multi_example`:
+
+```bash
+cd pairing_multi_example
+nargo compile
+nargo execute   # uses inputs from Prover.toml
+```
+
+`sp1_verify_example`:
+
+```bash
+cd sp1_verify_example
+nargo compile
+nargo execute   # uses inputs from Prover.toml
+```
+
+### Quick sanity test
+
+```bash
+cd groth16_verify
+nargo test
+```
+
 ## Pairing usage
 
 Single pairing:
