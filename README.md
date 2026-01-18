@@ -17,8 +17,10 @@ This repo contains two Noir libraries:
   BN254 (Fuentes-Castaneda, Knapp, Rodriguez-Henriquez 2011).
 - **Groth16 verification**: compute L = IC_0 + sum_i IC_{i+1} * input_i and check
   e(A, B) * e(C, -delta) * e(L, -gamma) = e(alpha, beta).
+- **Proof validation**: verifier enforces on-curve checks, rejects infinity points,
+  and checks G2 subgroup membership for proof points.
 - **SP1 fast path**: 2-scalar MSM with a 3-bit joint window (Straus/Shamir),
-  using a precomputed table of a*IC1 + b*IC2 to reduce constraints.
+  using embedded constants; use `verify_sp1_fast_with_table` only with trusted tables.
 
 Tests are slow; the fastest sanity check is in the Groth16 verifier.
 
@@ -125,5 +127,8 @@ fn check_sp1<const N: u32>(
     verify_sp1::<N>(vkey, public_values, proof)
 }
 ```
+
+For custom SP1 verifying keys and MSM tables, use `verify_sp1_fast_with_table` and
+ensure the table/VK are constants in the circuit.
 
 Example circuits live in `pairing_multi_example` and `sp1_verify_example`.

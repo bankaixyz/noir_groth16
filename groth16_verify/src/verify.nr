@@ -1,3 +1,4 @@
+use crate::config::sp1::{sp1_msm2_w3_table, sp1_vk};
 use crate::types::{Proof, VerifyingKey};
 use noir_bn254_pairing::fp::{fp_one};
 use noir_bn254_pairing::fp2::Fp2;
@@ -10,8 +11,10 @@ use noir_bn254_pairing::g1::{
     double_g1_jac,
     g1_affine_infinity,
     g1_jacobian_infinity,
+    is_on_curve_g1_affine,
     jacobian_to_affine_g1,
 };
+use noir_bn254_pairing::g2::{is_in_correct_subgroup_g2, is_on_curve_g2_affine};
 use noir_bn254_pairing::pairing::pairing_multi;
 
 /// Convert G1 affine to Jacobian without inversion.
@@ -154,6 +157,13 @@ pub fn verify<let N: u32, let L: u32>(
     public_inputs: [Field; N],
 ) -> bool {
     assert(L == N + 1);
+    assert(is_on_curve_g1_affine(proof.a));
+    assert(is_on_curve_g1_affine(proof.c));
+    assert(is_on_curve_g2_affine(proof.b));
+    assert(!proof.a.is_infinity());
+    assert(!proof.b.is_infinity());
+    assert(!proof.c.is_infinity());
+    assert(is_in_correct_subgroup_g2(proof.b));
 
     let mut acc = g1_affine_to_jac(vk.ic[0]);
     for i in 0..N {
@@ -170,13 +180,27 @@ pub fn verify<let N: u32, let L: u32>(
     fp12_eq(result, vk.alpha_beta)
 }
 
-/// Fast path for SP1 proofs with two public inputs and precomputed MSM table.
-pub fn verify_sp1_fast(
+/// Fast path for SP1 proofs with two public inputs and embedded constants.
+pub fn verify_sp1_fast(proof: Proof, public_inputs: [Field; 2]) -> bool {
+    let vk = sp1_vk();
+    let msm2_w3_table = sp1_msm2_w3_table();
+    verify_sp1_fast_with_table(vk, proof, public_inputs, msm2_w3_table)
+}
+
+/// Fast path with caller-supplied table and VK (must be trusted constants).
+pub fn verify_sp1_fast_with_table(
     vk: VerifyingKey<3>,
     proof: Proof,
     public_inputs: [Field; 2],
     msm2_w3_table: [G1Affine; 64],
 ) -> bool {
+    assert(is_on_curve_g1_affine(proof.a));
+    assert(is_on_curve_g1_affine(proof.c));
+    assert(is_on_curve_g2_affine(proof.b));
+    assert(!proof.a.is_infinity());
+    assert(!proof.b.is_infinity());
+    assert(!proof.c.is_infinity());
+    assert(is_in_correct_subgroup_g2(proof.b));
     let msm = msm2_window3_g1_jac(msm2_w3_table, public_inputs[0], public_inputs[1]);
     let acc = add_g1_jac_mixed(msm, vk.ic[0]);
     let l = jacobian_to_affine_g1(acc);

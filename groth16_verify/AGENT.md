@@ -6,7 +6,8 @@ This package provides a Groth16 verifier over BN254 built on `noir_bn254_pairing
 
 - `src/verify.nr`
   - `verify::<N, L>(vk, proof, public_inputs) -> bool`
-  - `verify_sp1_fast(vk, proof, public_inputs, msm2_w3_table) -> bool`
+  - `verify_sp1_fast(proof, public_inputs) -> bool`
+  - `verify_sp1_fast_with_table(vk, proof, public_inputs, msm2_w3_table) -> bool`
 - `src/sp1.nr`
   - `verify_sp1::<N>(vkey, public_values, proof) -> bool`
   - `sp1_public_inputs(vkey, public_values) -> [Field; 2]`
@@ -21,6 +22,7 @@ This package provides a Groth16 verifier over BN254 built on `noir_bn254_pairing
 2. Run a 3-pairing check:
    - `pairing_multi([A, C, L], [B, delta_neg, gamma_neg]) == alpha_beta`
 3. Return a boolean equality in `Fp12`.
+4. Enforce proof points are on-curve, non-infinity, and in the G2 subgroup.
 
 ## SP1-specific flow
 
