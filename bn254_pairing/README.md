@@ -3,6 +3,14 @@
 This package implements the BN254 pairing in Noir. It includes finite field arithmetic,
 G1/G2 operations, the Miller loop, and the final exponentiation.
 
+## Cryptography summary
+
+- **Curve**: E: y^2 = x^3 + 3 over Fp, with G1 = E(Fp)[r].
+- **Twist**: G2 is defined on the sextic twist E'(Fp2)[r].
+- **Pairing target**: Fp12 with embedding degree 12; result lies in GT.
+- **Final exponentiation split**:
+  (p^12 - 1) / r = (p^6 - 1) * (p^2 + 1) * (p^4 - p^2 + 1) / r.
+
 ## Main API
 
 Core pairing entrypoints:
@@ -21,22 +29,24 @@ Curve helpers you can `assert` against in your circuit:
 
 ## Algorithm overview
 
-- **Miller loop**: evaluates line functions from repeated `double_step` and
-  `add_mixed_step` updates on G2, then multiplies sparse line evaluations in Fp12.
-- **Final exponentiation**: easy part uses inverse + Frobenius; hard part uses
-  cyclotomic squaring and the `expt()` chain for the BN254 curve parameter.
+- **Miller loop**: evaluates f_{x,Q}(P) for the optimal Ate pairing using signed
+  NAF digits of the BN parameter x and sparse line evaluations in Fp12.
+- **Final exponentiation**: easy part uses inverse + Frobenius maps; hard part uses
+  cyclotomic squaring (Karabina 2010) and a fixed chain for BN254
+  (Fuentes-Castaneda, Knapp, Rodriguez-Henriquez 2011).
 
 ## Optimization notes
 
 The implementation uses several circuit-friendly optimizations:
 
 - **Pair filtering**: `filter_pairs` removes infinity inputs to skip work.
+- **Signed NAF loop**: reduces additions in the Miller loop without changing f_{x,Q}(P).
 - **Sparse line arithmetic**: line evaluations are handled via `mul_by_034`,
   `mul_034_by_034`, and `mul_by_01234` to avoid full Fp12 multiplies.
 - **Mixed additions on G2**: `double_step` and `add_mixed_step` avoid affine inversion
   costs and keep line evaluations cheap.
 - **Frobenius shortcuts**: final exponentiation uses `frobenius`, `frobenius_square`,
-  and `cyclotomic_square` for cheaper field ops.
+  and `cyclotomic_square` once the element is in the cyclotomic subgroup.
 
 ## Performance notes
 
