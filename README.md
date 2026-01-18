@@ -5,6 +5,21 @@ This repo contains two Noir libraries:
 - `noir_bn254_pairing`: BN254 pairing, final exponentiation, and curve ops.
 - `noir_groth16_verify`: Groth16 verification on BN254, plus an SP1-optimized path.
 
+## Cryptography summary
+
+- **Curve and groups**: BN254 (aka alt_bn128) with G1 over Fp and G2 over the
+  sextic twist in Fp2; pairing target is Fp12.
+- **Pairing**: optimal Ate pairing e: G1 x G2 -> Fp12, computed with a signed-NAF
+  Miller loop on the BN parameter x and finalized by a full exponentiation into
+  the r-torsion subgroup.
+- **Final exponentiation**: easy part uses Frobenius maps; hard part uses
+  cyclotomic squaring (Karabina 2010) and a fixed addition chain tailored to
+  BN254 (Fuentes-Castaneda, Knapp, Rodriguez-Henriquez 2011).
+- **Groth16 verification**: compute L = IC_0 + sum_i IC_{i+1} * input_i and check
+  e(A, B) * e(C, -delta) * e(L, -gamma) = e(alpha, beta).
+- **SP1 fast path**: 2-scalar MSM with a 3-bit joint window (Straus/Shamir),
+  using a precomputed table of a*IC1 + b*IC2 to reduce constraints.
+
 Tests are slow; the fastest sanity check is in the Groth16 verifier.
 
 ## Environment setup

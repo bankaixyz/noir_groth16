@@ -2,21 +2,25 @@ use crate::fp::{
     Fp, curve_b, fp_eight, fp_four, fp_one, fp_three, fp_two, fp_zero,
 };
 
+/// G1 affine point over Fp.
 pub struct G1Affine {
     pub x: Fp,
     pub y: Fp,
 }
 
+/// G1 Jacobian point (X:Y:Z) representing (X/Z^2, Y/Z^3).
 pub struct G1Jac {
     pub x: Fp,
     pub y: Fp,
     pub z: Fp,
 }
 
+/// Affine point at infinity (0, 0).
 pub fn g1_affine_infinity() -> G1Affine {
     G1Affine { x: fp_zero(), y: fp_zero() }
 }
 
+/// Jacobian point at infinity (1, 1, 0).
 pub fn g1_jacobian_infinity() -> G1Jac {
     G1Jac { x: fp_one(), y: fp_one(), z: fp_zero() }
 }
@@ -35,16 +39,19 @@ impl G1Jac {
     }
 }
 
+/// Check y^2 = x^3 + b for affine points, treating infinity as valid.
 pub fn is_on_curve_g1_affine(p: G1Affine) -> bool {
     let left = p.y * p.y;
     let right = (p.x * p.x * p.x) + curve_b();
     if p.is_infinity() { true } else { left == right }
 }
 
+/// Affine negation: (x, y) -> (x, -y).
 pub fn neg_g1_affine(p: G1Affine) -> G1Affine {
     G1Affine { x: p.x, y: -p.y }
 }
 
+/// Convert Jacobian to affine with a single inversion.
 pub fn jacobian_to_affine_g1(p: G1Jac) -> G1Affine {
     if p.is_infinity() {
         g1_affine_infinity()
@@ -57,6 +64,7 @@ pub fn jacobian_to_affine_g1(p: G1Jac) -> G1Affine {
     }
 }
 
+/// Affine addition with special-case handling for infinity and doubling.
 pub fn add_g1_affine(a: G1Affine, b: G1Affine) -> G1Affine {
     if a.is_infinity() {
         b
@@ -84,6 +92,7 @@ pub fn add_g1_affine(a: G1Affine, b: G1Affine) -> G1Affine {
     }
 }
 
+/// Mixed-coordinate doubling (affine input, Jacobian output).
 pub fn double_mixed_g1(a: G1Affine) -> G1Jac {
     let xx = a.x * a.x;
     let yy = a.y * a.y;
@@ -98,6 +107,7 @@ pub fn double_mixed_g1(a: G1Affine) -> G1Jac {
     G1Jac { x: x3, y: y3, z: z3 }
 }
 
+/// Jacobian addition with no inversions (complete with special cases).
 pub fn add_g1_jac(p: G1Jac, q: G1Jac) -> G1Jac {
     if p.is_infinity() {
         q
@@ -131,6 +141,7 @@ pub fn add_g1_jac(p: G1Jac, q: G1Jac) -> G1Jac {
     }
 }
 
+/// Mixed Jacobian + affine addition to save a field multiplication.
 pub fn add_g1_jac_mixed(p: G1Jac, q: G1Affine) -> G1Jac {
     if p.is_infinity() {
         if q.is_infinity() {
@@ -167,6 +178,7 @@ pub fn add_g1_jac_mixed(p: G1Jac, q: G1Affine) -> G1Jac {
     }
 }
 
+/// Jacobian point doubling (used in scalar multiplication).
 pub fn double_g1_jac(p: G1Jac) -> G1Jac {
     let a = p.x * p.x;
     let b = p.y * p.y;

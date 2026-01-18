@@ -2,6 +2,7 @@ use crate::fp2::{Fp2, fp2_one, fp2_zero};
 use crate::fp6::{Fp6, fp6_one, fp6_zero};
 
 // Fp12 = Fp6[w] / (w^2 - v)
+/// Quadratic extension field element c0 + c1 * w.
 pub struct Fp12 {
     pub c0: Fp6,
     pub c1: Fp6,
@@ -16,6 +17,7 @@ pub fn fp12_one() -> Fp12 {
 }
 
 impl Fp12 {
+    /// Check whether the element equals 1 in Fp12.
     pub fn is_one(self) -> bool {
         let zero = fp2_zero();
         let one = fp2_one();
@@ -39,10 +41,12 @@ impl Fp12 {
         Fp12 { c0: self.c0.neg(), c1: self.c1.neg() }
     }
 
+    /// Conjugation: c0 - c1 * w.
     pub fn conjugate(self) -> Fp12 {
         Fp12 { c0: self.c0, c1: self.c1.neg() }
     }
 
+    /// Karatsuba multiplication in Fp12.
     pub fn mul(self, other: Fp12) -> Fp12 {
         let a = (self.c0.add(self.c1)).mul(other.c0.add(other.c1));
         let b = self.c0.mul(other.c0);
@@ -53,6 +57,7 @@ impl Fp12 {
         Fp12 { c0, c1 }
     }
 
+    /// Squaring optimized for Fp12.
     pub fn square(self) -> Fp12 {
         let a = self.c0;
         let b = self.c1;
@@ -62,6 +67,7 @@ impl Fp12 {
         Fp12 { c0, c1 }
     }
 
+    /// Inversion via c0^2 - v*c1^2.
     pub fn inverse(self) -> Fp12 {
         let t0 = self.c0.square();
         let t1 = self.c1.square();
@@ -72,6 +78,7 @@ impl Fp12 {
         Fp12 { c0: self.c0.mul(t1), c1: self.c1.mul(t1).neg() }
     }
 
+    /// Cyclotomic squaring in the r-torsion subgroup (Karabina 2010).
     pub fn cyclotomic_square(self) -> Fp12 {
         let t0 = self.c1.b1.square();
         let t1 = self.c0.b0.square();
@@ -101,6 +108,7 @@ impl Fp12 {
         }
     }
 
+    /// Frobenius map: (c0, c1) -> (c0^p, c1^p) with precomputed coefficients.
     pub fn frobenius(self) -> Fp12 {
         let t0 = self.c0.b0.conjugate();
         let t1 = self.c0.b1.conjugate().mul_by_non_residue_1_power_2();
@@ -115,6 +123,7 @@ impl Fp12 {
         }
     }
 
+    /// Frobenius^2 map using sparse coefficients.
     pub fn frobenius_square(self) -> Fp12 {
         let t0 = self.c0.b0;
         let t1 = self.c0.b1.mul_by_non_residue_2_power_2();
@@ -129,6 +138,7 @@ impl Fp12 {
         }
     }
 
+    /// Frobenius^3 map using sparse coefficients.
     pub fn frobenius_cube(self) -> Fp12 {
         let t0 = self.c0.b0.conjugate();
         let t1 = self.c0.b1.conjugate().mul_by_non_residue_3_power_2();
@@ -143,6 +153,7 @@ impl Fp12 {
         }
     }
 
+    /// Multiply by sparse line element with non-zero coeffs in slots 0,3,4.
     pub fn mul_by_034(self, c0: Fp2, c3: Fp2, c4: Fp2) -> Fp12 {
         let a = self.c0.mul_by_e2(c0);
         let b = self.c1.mul_by_01(c3, c4);
@@ -155,6 +166,7 @@ impl Fp12 {
         Fp12 { c0, c1 }
     }
 
+    /// Multiply by sparse element with coeffs in slots 3 and 4.
     pub fn mul_by_34(self, c3: Fp2, c4: Fp2) -> Fp12 {
         let a = self.c0;
         let b = self.c1.mul_by_01(c3, c4);
@@ -167,6 +179,7 @@ impl Fp12 {
         Fp12 { c0, c1 }
     }
 
+    /// Multiply by sparse element with coeffs in slots 0..4.
     pub fn mul_by_01234(self, x: [Fp2; 5]) -> Fp12 {
         let c0 = Fp6 { b0: x[0], b1: x[1], b2: x[2] };
         let c1 = Fp6 { b0: x[3], b1: x[4], b2: fp2_zero() };
@@ -181,6 +194,8 @@ impl Fp12 {
         Fp12 { c0, c1 }
     }
 
+    /// Exponentiation by (x) and its powers in the cyclotomic subgroup.
+    /// Uses a fixed addition chain tailored to BN254 (Fuentes-Castaneda et al. 2011).
     pub fn expt(self) -> Fp12 {
         let x = self;
         let t3 = x.cyclotomic_square();
@@ -216,6 +231,7 @@ impl Fp12 {
         result
     }
 
+    /// Repeated cyclotomic squaring.
     pub fn n_square(self, n: u32) -> Fp12 {
         let mut result = self;
         for _ in 0..n {
@@ -225,6 +241,7 @@ impl Fp12 {
     }
 }
 
+/// Multiply two sparse line evaluations (coeffs 0,3,4) into 5-slot form.
 pub fn mul_034_by_034(d0: Fp2, d3: Fp2, d4: Fp2, c0: Fp2, c3: Fp2, c4: Fp2) -> [Fp2; 5] {
     let x0 = c0.mul(d0);
     let x3 = c3.mul(d3);

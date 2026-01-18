@@ -3,6 +3,7 @@ use bignum::BigNum;
 
 
 // Fp2 = Fp[u] / (u^2 + 1)
+/// Quadratic extension field element c0 + c1 * u.
 pub struct Fp2 {
     pub c0: Fp,
     pub c1: Fp,
@@ -16,10 +17,12 @@ pub fn fp2_one() -> Fp2 {
     Fp2 { c0: fp_one(), c1: fp_zero() }
 }
 
+/// Quadratic non-residue used for the Fp6 construction, xi = 9 + u.
 pub fn non_residue() -> Fp2 {
     Fp2 { c0: fp_nine(), c1: fp_one() } // 9 + u
 }
 
+/// Inverse of xi = 9 + u for fast multiplication by xi^{-1}.
 pub fn non_residue_inv() -> Fp2 {
     Fp2 {
         c0: Fp::from_limbs([0x8cc310c2c3330c99e39557176f553d, 0x47984f7911f74c0bec3cf559b143b7, 0x2fb3]),
@@ -27,6 +30,7 @@ pub fn non_residue_inv() -> Fp2 {
     }
 }
 
+/// Twist curve parameter b' for the BN254 sextic twist.
 pub fn b_twist() -> Fp2 {
     Fp2 {
         c0: Fp::from_limbs([0xb4c5e559dbefa33267e6dc24a138e5, 0x9d40ceb8aaae81be18991be06ac3b5, 0x2b14]),
@@ -34,6 +38,7 @@ pub fn b_twist() -> Fp2 {
     }
 }
 
+/// Endomorphism coefficient u for the G2 psi map (Frobenius on twist).
 pub fn endo_u() -> Fp2 {
     Fp2 {
         c0: Fp::from_limbs([0x8cc310c2c3330c99e39557176f553d, 0x47984f7911f74c0bec3cf559b143b7, 0x2fb3]),
@@ -41,6 +46,7 @@ pub fn endo_u() -> Fp2 {
     }
 }
 
+/// Endomorphism coefficient v for the G2 psi map (Frobenius on twist).
 pub fn endo_v() -> Fp2 {
     Fp2 {
         c0: Fp::from_limbs([0xaae0eda9c95998dc54014671a0135a, 0xf305489af5dcdc5ec698b6e2f9b9db, 0x63c]),
@@ -48,6 +54,7 @@ pub fn endo_v() -> Fp2 {
     }
 }
 
+/// Frobenius coefficients for Fp2: xi^{(p^i-1)/2} for i = 1..5.
 pub fn frobenius_1_power_1() -> Fp2 {
     Fp2 {
         c0: Fp::from_limbs([0x521e08292f2176d60b35dadcc9e470, 0xb71c2865a7dfe8b99fdd76e68b605c, 0x1284]),
@@ -83,6 +90,7 @@ pub fn frobenius_1_power_5() -> Fp2 {
     }
 }
 
+/// Frobenius coefficients for Fp6: xi^{(p^i-1)/3} for i = 1..5.
 pub fn frobenius_2_power_1() -> Fp {
     Fp::from_limbs([0x8f069fbb966e3de4bd44e5607cfd49, 0x4e72e131a0295e6dd9e7e0acccb0c2, 0x3064])
 }
@@ -103,6 +111,7 @@ pub fn frobenius_2_power_5() -> Fp {
     Fp::from_limbs([0xf263f1acdb5c4f5763473177ffffff, 0x59e26bcea0d48bacd4, 0x0])
 }
 
+/// Frobenius coefficients for Fp12: xi^{(p^i-1)/6} for i = 1..5.
 pub fn frobenius_3_power_1() -> Fp2 {
     Fp2 {
         c0: Fp::from_limbs([0x4cb38dbe55d24ae86f7d391ed4a67f, 0x81cfcc82e4bbefe9608cd0acaa9089, 0x19dc]),
@@ -160,10 +169,12 @@ impl Fp2 {
         self.mul_by_element(inv_two)
     }
 
+    /// Conjugation: c0 - c1 * u.
     pub fn conjugate(self) -> Fp2 {
         Fp2 { c0: self.c0, c1: -self.c1 }
     }
 
+    /// Karatsuba multiplication: (a0 + a1*u)(b0 + b1*u).
     pub fn mul(self, other: Fp2) -> Fp2 {
         let a = (self.c0 + self.c1) * (other.c0 + other.c1);
         let b = self.c0 * other.c0;
@@ -171,6 +182,7 @@ impl Fp2 {
         Fp2 { c0: b - c, c1: a - b - c }
     }
 
+    /// Complex squaring in Fp2 using 2 multiplications.
     pub fn square(self) -> Fp2 {
         let a = (self.c0 + self.c1) * (self.c0 - self.c1);
         let b = self.c0 * self.c1;
@@ -178,6 +190,7 @@ impl Fp2 {
         Fp2 { c0: a, c1: b }
     }
 
+    /// Inversion via (a0 - a1*u) / (a0^2 + a1^2).
     pub fn inverse(self) -> Fp2 {
         let t0 = self.c0 * self.c0;
         let t1 = self.c1 * self.c1;
@@ -186,6 +199,7 @@ impl Fp2 {
         Fp2 { c0: self.c0 * t1, c1: -(self.c1 * t1) }
     }
 
+    /// Multiply by xi = 9 + u using additions only (sparse constant).
     pub fn mul_by_non_residue(self) -> Fp2 {
         let two_a0 = self.c0 + self.c0;
         let four_a0 = two_a0 + two_a0;
@@ -207,6 +221,7 @@ impl Fp2 {
         self.mul(b_twist())
     }
 
+    /// Multiply by Frobenius coefficient xi^{(p-1)/2}.
     pub fn mul_by_non_residue_1_power_1(self) -> Fp2 {
         self.mul(frobenius_1_power_1())
     }

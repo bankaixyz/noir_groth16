@@ -3,6 +3,15 @@
 This package provides a Groth16 verifier over BN254, with a fast SP1-specific
 path for two public inputs.
 
+## Cryptography summary
+
+- **Groth16 equation**: compute L = IC_0 + sum_i IC_{i+1} * input_i and check
+  e(A, B) * e(C, -delta) * e(L, -gamma) = e(alpha, beta) in Fp12.
+- **Public inputs**: inputs are BN254 scalars; the SP1 path hashes public values
+  with SHA256 and masks to 253 bits to stay in the scalar field.
+- **MSM optimization**: the SP1 fast path uses a joint-window MSM (Straus/Shamir)
+  with precomputed table entries a*IC1 + b*IC2 for 3-bit digits.
+
 ## Main API
 
 Generic verifier:

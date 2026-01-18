@@ -8,7 +8,7 @@ use noir_bn254_pairing::g2::G2Affine;
 use noir_bn254_pairing::BigNum;
 use sha256::sha256_var;
 
-/// Convert 32 big-endian bytes to a Field element
+/// Convert 32 big-endian bytes to a Field element.
 fn bytes32_to_field(bytes: [u8; 32]) -> Field {
     let mut result: Field = 0;
     for i in 0..32 {
@@ -17,27 +17,28 @@ fn bytes32_to_field(bytes: [u8; 32]) -> Field {
     result
 }
 
-/// Convert a SHA256 hash to a BN254 field element with 253-bit masking
-/// Clears the top 3 bits of the hash to ensure it fits in the scalar field
+/// Convert a SHA256 hash to a BN254 scalar by masking to 253 bits.
+/// Clears the top 3 bits so the value fits in the scalar field.
 pub fn hash_to_field(hash: [u8; 32]) -> Field {
     let mut masked = hash;
     masked[0] = masked[0] & 0x1F;
     bytes32_to_field(masked)
 }
 
-/// Hash public values using SHA256 and mask to 253 bits
+/// Hash public values using SHA256 and mask to 253 bits.
 fn hash_public_values<let N: u32>(public_values: [u8; N]) -> Field {
     let hash: [u8; 32] = sha256_var(public_values, N);
     hash_to_field(hash)
 }
 
+/// SP1 public inputs: [vkey, H(public_values)] where H is SHA256.
 pub fn sp1_public_inputs<let N: u32>(vkey: Field, public_values: [u8; N]) -> [Field; 2] {
     let input0 = vkey;
     let input1 = hash_public_values(public_values);
     [input0, input1]
 }
 
-/// Verifies an SP1 Groth16 proof
+/// Verifies an SP1 Groth16 proof.
 ///
 /// SP1 wraps its STARK proof in a Groth16 proof on BN254.
 /// The verification uses two public inputs:
@@ -57,10 +58,12 @@ pub fn verify_sp1<let N: u32>(
     verify_sp1_fast(sp1_vk(), proof, public_inputs, sp1_msm2_w3_table())
 }
 
+/// Build an Fp element from 3 u128 limbs (BN254 limb order).
 fn fp_from_limbs(l0: u128, l1: u128, l2: u128) -> Fp {
     Fp::from_limbs([l0, l1, l2])
 }
 
+/// Build an Fp2 element from two Fp limb arrays.
 fn fp2_from_limbs(a0: [u128; 3], a1: [u128; 3]) -> Fp2 {
     Fp2 { c0: fp_from_limbs(a0[0], a0[1], a0[2]), c1: fp_from_limbs(a1[0], a1[1], a1[2]) }
 }
