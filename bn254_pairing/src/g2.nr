@@ -1,33 +1,39 @@
 use crate::fp::fp_three;
 use crate::fp2::{Fp2, b_twist, endo_u, endo_v, fp2_one, fp2_zero};
 
+/// G2 affine point over Fp2.
 pub struct G2Affine {
     pub x: Fp2,
     pub y: Fp2,
 }
 
+/// G2 Jacobian point (X:Y:Z) representing (X/Z^2, Y/Z^3).
 pub struct G2Jac {
     pub x: Fp2,
     pub y: Fp2,
     pub z: Fp2,
 }
 
+/// G2 projective point used for Miller loop steps.
 pub struct G2Proj {
     pub x: Fp2,
     pub y: Fp2,
     pub z: Fp2,
 }
 
+/// Line function l_{R,P}(Q) coefficients for Miller loop evaluation.
 pub struct LineEvaluation {
     pub r0: Fp2,
     pub r1: Fp2,
     pub r2: Fp2,
 }
 
+/// Affine point at infinity (0, 0).
 pub fn g2_affine_infinity() -> G2Affine {
     G2Affine { x: fp2_zero(), y: fp2_zero() }
 }
 
+/// Jacobian point at infinity (1, 1, 0).
 pub fn g2_jacobian_infinity() -> G2Jac {
     G2Jac { x: fp2_one(), y: fp2_one(), z: fp2_zero() }
 }
@@ -46,16 +52,19 @@ impl G2Jac {
     }
 }
 
+/// Check y^2 = x^3 + b' for affine points, treating infinity as valid.
 pub fn is_on_curve_g2_affine(p: G2Affine) -> bool {
     let left = p.y.square();
     let right = p.x.square().mul(p.x).add(b_twist());
     if p.is_infinity() { true } else { fp2_eq(left, right) }
 }
 
+/// Affine negation: (x, y) -> (x, -y).
 pub fn neg_g2_affine(p: G2Affine) -> G2Affine {
     G2Affine { x: p.x, y: p.y.neg() }
 }
 
+/// Convert Jacobian to affine with a single inversion.
 pub fn jacobian_to_affine_g2(p: G2Jac) -> G2Affine {
     if p.is_infinity() {
         g2_affine_infinity()
@@ -68,6 +77,7 @@ pub fn jacobian_to_affine_g2(p: G2Jac) -> G2Affine {
     }
 }
 
+/// Jacobian addition with no inversions (complete with special cases).
 pub fn add_g2_jac(p: G2Jac, q: G2Jac) -> G2Jac {
     if p.is_infinity() {
         q
@@ -100,6 +110,7 @@ pub fn add_g2_jac(p: G2Jac, q: G2Jac) -> G2Jac {
     }
 }
 
+/// Jacobian point doubling (used in scalar multiplication).
 pub fn double_g2_jac(p: G2Jac) -> G2Jac {
     let a = p.x.square();
     let b = p.y.square();
@@ -115,6 +126,7 @@ pub fn double_g2_jac(p: G2Jac) -> G2Jac {
     G2Jac { x: x3, y: y3, z: z3 }
 }
 
+/// Convert affine to projective (Z = 1) for Miller loop steps.
 pub fn projective_from_affine_g2(a: G2Affine) -> G2Proj {
     if a.is_infinity() {
         G2Proj { x: fp2_one(), y: fp2_one(), z: fp2_zero() }
@@ -123,18 +135,21 @@ pub fn projective_from_affine_g2(a: G2Affine) -> G2Proj {
     }
 }
 
+/// Frobenius map on the twist: Q -> Q^p with precomputed coefficients.
 pub fn frobenius_g2(q: G2Affine) -> G2Affine {
     let x = q.x.conjugate().mul_by_non_residue_1_power_2();
     let y = q.y.conjugate().mul_by_non_residue_1_power_3();
     G2Affine { x, y }
 }
 
+/// Frobenius^2 map on the twist, used in final Miller steps.
 pub fn frobenius_square_g2(q: G2Affine) -> G2Affine {
     let x = q.x.mul_by_non_residue_2_power_2();
     let y = q.y.mul_by_non_residue_2_power_3().neg();
     G2Affine { x, y }
 }
 
+/// Endomorphism psi: conjugation + constants (GLV-style on BN curves).
 pub fn psi_g2(p: G2Jac) -> G2Jac {
     let x = p.x.conjugate().mul(endo_u());
     let y = p.y.conjugate().mul(endo_v());
@@ -143,6 +158,7 @@ pub fn psi_g2(p: G2Jac) -> G2Jac {
 }
 
 impl G2Proj {
+    /// Doubling step that also returns the tangent line evaluation.
     pub fn double_step(self) -> (G2Proj, LineEvaluation) {
         let a = self.x.mul(self.y).halve();
         let b = self.y.square();
@@ -169,6 +185,7 @@ impl G2Proj {
         (G2Proj { x, y, z }, line)
     }
 
+    /// Mixed addition step (projective + affine) with line evaluation.
     pub fn add_mixed_step(self, a: G2Affine) -> (G2Proj, LineEvaluation) {
         let y2z1 = a.y.mul(self.z);
         let o = self.y.sub(y2z1);
@@ -194,6 +211,7 @@ impl G2Proj {
         (G2Proj { x, y, z }, line)
     }
 
+    /// Compute the line evaluation for adding affine a to self.
     pub fn line_compute(self, a: G2Affine) -> (G2Proj, LineEvaluation) {
         let y2z1 = a.y.mul(self.z);
         let o = self.y.sub(y2z1);

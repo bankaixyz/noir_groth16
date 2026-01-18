@@ -12,6 +12,7 @@ use crate::g2::{
 };
 use std::println;
 
+/// Signed NAF digits of BN254 parameter x for the optimal Ate loop.
 fn loop_counter() -> [i8; 66] {
     [
         0, 0, 0, 1, 0, 1, 0, -1, 0, 0, -1, 0, 0, 0, 1, 0,
@@ -22,6 +23,7 @@ fn loop_counter() -> [i8; 66] {
     ]
 }
 
+/// Evaluate line l(X, Y) = r0*Y + r1*X + r2 at affine point P.
 fn line_eval_at_point(line: LineEvaluation, p: G1Affine) -> LineEvaluation {
     LineEvaluation {
         r0: line.r0.mul_by_element(p.y),
@@ -34,6 +36,7 @@ fn line_eval_at_point(line: LineEvaluation, p: G1Affine) -> LineEvaluation {
 // Use fixed-string NDJSON logs to avoid formatting support limitations.
 // #endregion agent log helpers
 
+/// Filter out infinity pairs to avoid extra Miller loop work.
 fn filter_pairs<let N: u32>(
     p_list: [G1Affine; N],
     q_list: [G2Affine; N],
@@ -55,6 +58,11 @@ fn filter_pairs<let N: u32>(
     (p_filtered, q_filtered, count)
 }
 
+/// Multi-pairing Miller loop for BN254.
+///
+/// Computes f = ∏_{i=0}^{n-1} f_{x,Q_i}(P_i) using signed NAF digits of x
+/// (optimal Ate pairing). Uses sparse line multiplication and mixed additions
+/// to reduce Fp12 costs.
 pub fn miller_loop<let N: u32>(p_list: [G1Affine; N], q_list: [G2Affine; N]) -> Fp12 {
     let (p, q, n) = filter_pairs(p_list, q_list);
     let mut result = fp12_one();
@@ -69,6 +77,7 @@ pub fn miller_loop<let N: u32>(p_list: [G1Affine; N], q_list: [G2Affine; N]) -> 
             }
         }
 
+        // Seed with the first line to avoid an extra Fp12 multiply by 1.
         if n >= 1 {
             let (q0, line) = q_proj[0].double_step();
             q_proj[0] = q0;
@@ -78,6 +87,7 @@ pub fn miller_loop<let N: u32>(p_list: [G1Affine; N], q_list: [G2Affine; N]) -> 
             result.c1.b1 = line.r2;
         }
 
+        // Fuse the second line with the first using sparse multiplication.
         if n >= 2 {
             let (q1, line) = q_proj[1].double_step();
             q_proj[1] = q1;
@@ -156,6 +166,7 @@ pub fn miller_loop<let N: u32>(p_list: [G1Affine; N], q_list: [G2Affine; N]) -> 
             }
         }
 
+        // Final steps: Frobenius-related additions for BN curves.
         for k in 0..N {
             if k < n {
                 let q1 = frobenius_g2(q[k]);
@@ -178,6 +189,7 @@ pub fn miller_loop<let N: u32>(p_list: [G1Affine; N], q_list: [G2Affine; N]) -> 
     result
 }
 
+/// Final exponentiation easy part: z^{p^6-1} * z^{p^2+1}.
 pub fn final_exp_easy_part(z: Fp12) -> Fp12 {
     let t0 = z.conjugate();
     let result = z.inverse();
@@ -186,6 +198,10 @@ pub fn final_exp_easy_part(z: Fp12) -> Fp12 {
     result
 }
 
+/// Final exponentiation hard part: exponent (p^4 - p^2 + 1) / r.
+///
+/// Uses cyclotomic squaring and Frobenius maps with a fixed addition chain
+/// (Fuentes-Castaneda et al. 2011) optimized for BN254.
 pub fn final_exp_hard_part(result: Fp12) -> Fp12 {
     let mut output = result;
     if result.is_one() {
@@ -227,6 +243,7 @@ pub fn final_exp_hard_part(result: Fp12) -> Fp12 {
     output
 }
 
+/// Full final exponentiation: z^{(p^12 - 1) / r}.
 pub fn final_exponentiation(z: Fp12) -> Fp12 {
     let result = final_exp_easy_part(z);
     let mut output = result;
@@ -237,6 +254,7 @@ pub fn final_exponentiation(z: Fp12) -> Fp12 {
     output
 }
 
+/// Compute BN254 pairing e(P, Q).
 pub fn pairing(p: G1Affine, q: G2Affine) -> Fp12 {
     let p_list = [p];
     let q_list = [q];
@@ -244,6 +262,7 @@ pub fn pairing(p: G1Affine, q: G2Affine) -> Fp12 {
     final_exponentiation(f)
 }
 
+/// Compute product of pairings ∏ e(P_i, Q_i).
 pub fn pairing_multi<let N: u32>(p_list: [G1Affine; N], q_list: [G2Affine; N]) -> Fp12 {
     let f = miller_loop(p_list, q_list);
     final_exponentiation(f)

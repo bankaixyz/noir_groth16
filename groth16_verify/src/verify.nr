@@ -14,6 +14,7 @@ use noir_bn254_pairing::g1::{
 };
 use noir_bn254_pairing::pairing::pairing_multi;
 
+/// Convert G1 affine to Jacobian without inversion.
 fn g1_affine_to_jac(p: G1Affine) -> G1Jac {
     if p.is_infinity() {
         g1_jacobian_infinity()
@@ -22,10 +23,14 @@ fn g1_affine_to_jac(p: G1Affine) -> G1Jac {
     }
 }
 
+/// Branchless select between two affine points based on a bit.
 fn select_g1_affine(cond: u1, a: G1Affine, b: G1Affine) -> G1Affine {
     if cond == 1 { a } else { b }
 }
 
+/// Select a point from a 64-entry table using a 6-bit index.
+///
+/// Implemented as a binary selection tree to keep constraints small.
 fn select_g1_affine_by_u6(table: [G1Affine; 64], idx_bits: [u1; 6]) -> G1Affine {
     let mut lvl0 = [g1_affine_infinity(); 32];
     for i in 0..32 {
@@ -55,6 +60,10 @@ fn select_g1_affine_by_u6(table: [G1Affine; 64], idx_bits: [u1; 6]) -> G1Affine 
     select_g1_affine(idx_bits[5], lvl4[1], lvl4[0])
 }
 
+/// Two-scalar MSM using 3-bit windows (Straus/Shamir's trick).
+///
+/// Computes a*P + b*Q with a shared precomputed table indexed by
+/// (a_digit + 8 * b_digit) for each 3-bit window.
 fn msm2_window3_g1_jac(
     table: [G1Affine; 64],
     a: Field,
@@ -99,12 +108,14 @@ fn msm2_window3_g1_jac(
     acc
 }
 
+/// Equality check for Fp2 elements (component-wise).
 fn fp2_eq(a: Fp2, b: Fp2) -> bool {
     let c0 = a.c0 == b.c0;
     let c1 = a.c1 == b.c1;
     c0 & c1
 }
 
+/// Equality check for Fp12 elements (component-wise).
 fn fp12_eq(a: Fp12, b: Fp12) -> bool {
     let c0 = fp2_eq(a.c0.b0, b.c0.b0);
     let c1 = fp2_eq(a.c0.b1, b.c0.b1);
@@ -115,6 +126,7 @@ fn fp12_eq(a: Fp12, b: Fp12) -> bool {
     c0 & c1 & c2 & c3 & c4 & c5
 }
 
+/// Double-and-add scalar multiplication in G1.
 fn scalar_mul_g1(p: G1Affine, scalar: Field) -> G1Affine {
     let mut acc = g1_jacobian_infinity();
     if !p.is_infinity() {
@@ -133,6 +145,9 @@ fn scalar_mul_g1(p: G1Affine, scalar: Field) -> G1Affine {
     jacobian_to_affine_g1(acc)
 }
 
+/// Groth16 verification:
+///   L = IC_0 + sum_{i=1}^N IC_i * input_i
+///   Check e(A, B) * e(C, -delta) * e(L, -gamma) = e(alpha, beta)
 pub fn verify<let N: u32, let L: u32>(
     vk: VerifyingKey<L>,
     proof: Proof,
@@ -155,6 +170,7 @@ pub fn verify<let N: u32, let L: u32>(
     fp12_eq(result, vk.alpha_beta)
 }
 
+/// Fast path for SP1 proofs with two public inputs and precomputed MSM table.
 pub fn verify_sp1_fast(
     vk: VerifyingKey<3>,
     proof: Proof,

@@ -1,6 +1,7 @@
 use crate::fp2::{Fp2, fp2_one, fp2_zero};
 
 // Fp6 = Fp2[v] / (v^3 - xi), xi = 9 + u
+/// Cubic extension field element b0 + b1 * v + b2 * v^2.
 pub struct Fp6 {
     pub b0: Fp2,
     pub b1: Fp2,
@@ -44,6 +45,7 @@ impl Fp6 {
         }
     }
 
+    /// Multiply by v (the non-residue) via component rotation.
     pub fn mul_by_non_residue(self) -> Fp6 {
         Fp6 {
             b0: self.b2.mul_by_non_residue(),
@@ -60,6 +62,7 @@ impl Fp6 {
         }
     }
 
+    /// Karatsuba multiplication in Fp6 (3 Fp2 muls + non-residue).
     pub fn mul(self, other: Fp6) -> Fp6 {
         let t0 = self.b0.mul(other.b0);
         let t1 = self.b1.mul(other.b1);
@@ -80,6 +83,7 @@ impl Fp6 {
         Fp6 { b0: c0, b1: c1, b2: c2 }
     }
 
+    /// Squaring optimized for Fp6 (symmetric Karatsuba).
     pub fn square(self) -> Fp6 {
         let c4 = self.b0.mul(self.b1).double();
         let c5 = self.b2.square();
@@ -95,6 +99,7 @@ impl Fp6 {
         Fp6 { b0: c0, b1: c1, b2 }
     }
 
+    /// Inversion via norm and Fp2 inversion.
     pub fn inverse(self) -> Fp6 {
         let t0 = self.b0.square();
         let t1 = self.b1.square();
@@ -117,6 +122,7 @@ impl Fp6 {
         Fp6 { b0: c0.mul(t6), b1: c1.mul(t6), b2: c2.mul(t6) }
     }
 
+    /// Multiply by sparse element (c0 + c1 * v).
     pub fn mul_by_01(self, c0: Fp2, c1: Fp2) -> Fp6 {
         let a = self.b0.mul(c0);
         let b = self.b1.mul(c1);
@@ -135,6 +141,7 @@ impl Fp6 {
         Fp6 { b0: t0, b1: t1, b2: t2 }
     }
 
+    /// Multiply by sparse element (c1 * v).
     pub fn mul_by_1(self, c1: Fp2) -> Fp6 {
         let b = self.b1.mul(c1);
 
@@ -147,6 +154,7 @@ impl Fp6 {
         Fp6 { b0: t0, b1: t1, b2: b }
     }
 
+    /// Multiply by sparse element (b1 * v + b2 * v^2).
     pub fn mul_by_12(self, b1: Fp2, b2: Fp2) -> Fp6 {
         let t1 = self.b1.mul(b1);
         let t2 = self.b2.mul(b2);
