@@ -198,6 +198,18 @@ pub fn final_exp_easy_part(z: Fp12) -> Fp12 {
     result
 }
 
+/// Final exponentiation easy part using a provided inverse for z.
+/// Asserts that z_inv is the true inverse to keep the circuit sound.
+pub fn final_exp_easy_part_with_inverse(z: Fp12, z_inv: Fp12) -> Fp12 {
+    let check = z.mul(z_inv);
+    assert(check.is_one());
+
+    let t0 = z.conjugate();
+    let t0 = t0.mul(z_inv);
+    let result = t0.frobenius_square().mul(t0);
+    result
+}
+
 /// Final exponentiation hard part: exponent (p^4 - p^2 + 1) / r.
 ///
 /// Uses cyclotomic squaring and Frobenius maps with a fixed addition chain
@@ -254,6 +266,18 @@ pub fn final_exponentiation(z: Fp12) -> Fp12 {
     output
 }
 
+/// Full final exponentiation with a provided Miller loop inverse.
+/// Asserts the inverse to avoid unsound witnesses.
+pub fn final_exponentiation_with_inverse(z: Fp12, z_inv: Fp12) -> Fp12 {
+    let result = final_exp_easy_part_with_inverse(z, z_inv);
+    let mut output = result;
+    if result.is_one() {
+    } else {
+        output = final_exp_hard_part(result);
+    }
+    output
+}
+
 /// Compute BN254 pairing e(P, Q).
 pub fn pairing(p: G1Affine, q: G2Affine) -> Fp12 {
     let p_list = [p];
@@ -262,8 +286,28 @@ pub fn pairing(p: G1Affine, q: G2Affine) -> Fp12 {
     final_exponentiation(f)
 }
 
+/// Compute BN254 pairing with a provided Miller loop inverse.
+/// This saves the Fp12 inversion in the easy part of final exponentiation.
+pub fn pairing_with_miller_inverse(p: G1Affine, q: G2Affine, f_inv: Fp12) -> Fp12 {
+    let p_list = [p];
+    let q_list = [q];
+    let f = miller_loop(p_list, q_list);
+    final_exponentiation_with_inverse(f, f_inv)
+}
+
 /// Compute product of pairings ∏ e(P_i, Q_i).
 pub fn pairing_multi<let N: u32>(p_list: [G1Affine; N], q_list: [G2Affine; N]) -> Fp12 {
     let f = miller_loop(p_list, q_list);
     final_exponentiation(f)
+}
+
+/// Compute product of pairings using a provided Miller loop inverse.
+/// This saves the Fp12 inversion in the easy part of final exponentiation.
+pub fn pairing_multi_with_miller_inverse<let N: u32>(
+    p_list: [G1Affine; N],
+    q_list: [G2Affine; N],
+    f_inv: Fp12,
+) -> Fp12 {
+    let f = miller_loop(p_list, q_list);
+    final_exponentiation_with_inverse(f, f_inv)
 }

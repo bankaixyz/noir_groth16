@@ -16,9 +16,12 @@ G1/G2 operations, the Miller loop, and the final exponentiation.
 Core pairing entrypoints:
 
 - `pairing(p: G1Affine, q: G2Affine) -> Fp12`
+- `pairing_with_miller_inverse(p: G1Affine, q: G2Affine, f_inv: Fp12) -> Fp12`
 - `pairing_multi(p: [G1Affine; N], q: [G2Affine; N]) -> Fp12`
+- `pairing_multi_with_miller_inverse(p: [G1Affine; N], q: [G2Affine; N], f_inv: Fp12) -> Fp12`
 - `miller_loop(p: [G1Affine; N], q: [G2Affine; N]) -> Fp12`
 - `final_exponentiation(z: Fp12) -> Fp12`
+- `final_exponentiation_with_inverse(z: Fp12, z_inv: Fp12) -> Fp12`
 
 Curve helpers you can `assert` against in your circuit:
 
@@ -45,6 +48,10 @@ The implementation uses several circuit-friendly optimizations:
   `mul_034_by_034`, and `mul_by_01234` to avoid full Fp12 multiplies.
 - **Mixed additions on G2**: `double_step` and `add_mixed_step` avoid affine inversion
   costs and keep line evaluations cheap.
+- **Miller inverse witness**: if you can supply `f_inv = miller_loop(...)^{-1}` as a
+  witness, the circuit asserts `f * f_inv == 1` and skips the Fp12 inversion in the
+  easy part of final exponentiation. Use `pairing_with_miller_inverse` or
+  `pairing_multi_with_miller_inverse` for this path.
 - **Frobenius shortcuts**: final exponentiation uses `frobenius`, `frobenius_square`,
   and `cyclotomic_square` once the element is in the cyclotomic subgroup.
 
