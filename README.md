@@ -47,7 +47,7 @@ First runs will fetch git dependencies (e.g. `noir-bignum`, `sha256`) automatica
 ```bash
 cd pairing_multi_example
 nargo compile
-nargo execute   # uses inputs from Prover.toml
+nargo execute
 ```
 
 `pairing_multi_inverse_example` (inverse-assisted final exponentiation):
