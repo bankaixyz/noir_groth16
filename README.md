@@ -50,6 +50,14 @@ nargo compile
 nargo execute   # uses inputs from Prover.toml
 ```
 
+`pairing_multi_inverse_example` (inverse-assisted final exponentiation):
+
+```bash
+cd pairing_multi_inverse_example
+nargo compile
+nargo execute
+```
+
 `sp1_verify_example`:
 
 ```bash
