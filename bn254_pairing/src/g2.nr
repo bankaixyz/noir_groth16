@@ -102,14 +102,17 @@ pub fn scalar_mul_g2_by_u128(p: G2Jac, scalar: u128) -> G2Jac {
     acc
 }
 
-/// Subgroup check using the Frobenius endomorphism: psi(P) == [x]P.
+/// Subgroup check using the Frobenius endomorphism: psi(P) == [6x^2]P.
 pub fn is_in_correct_subgroup_g2(p: G2Affine) -> bool {
     if p.is_infinity() {
         false
     } else {
         let p_jac = g2_affine_to_jacobian(p);
         let psi = psi_g2(p_jac);
-        let x_p = scalar_mul_g2_by_u128(p_jac, seed_x0());
+        let x = seed_x0();
+        let x2 = x * x;
+        let k = x2 * 6;
+        let x_p = scalar_mul_g2_by_u128(p_jac, k);
         let psi_aff = jacobian_to_affine_g2(psi);
         let x_aff = jacobian_to_affine_g2(x_p);
         fp2_eq(psi_aff.x, x_aff.x) & fp2_eq(psi_aff.y, x_aff.y)

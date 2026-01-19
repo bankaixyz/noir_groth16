@@ -3,7 +3,7 @@ use crate::fp2::{Fp2, fp2_one};
 use crate::g2::{
     G2Affine, G2Jac, add_g2_jac, double_g2_jac, g2_affine_infinity,
     g2_jacobian_infinity, is_on_curve_g2_affine, jacobian_to_affine_g2,
-    psi_g2,
+    is_in_correct_subgroup_g2, psi_g2,
 };
 use bignum::BigNum;
 
@@ -235,4 +235,11 @@ fn g2_psi_maps_to_curve() {
     let x_eq = fp2_eq(psi_aff.x, g_aff.x);
     let y_eq = fp2_eq(psi_aff.y, g_aff.y);
     assert(!(x_eq & y_eq));
+}
+
+#[test]
+fn g2_subgroup_check_generator() {
+    let g = generator();
+    assert(is_in_correct_subgroup_g2(g));
+    assert(!is_in_correct_subgroup_g2(g2_affine_infinity()));
 }

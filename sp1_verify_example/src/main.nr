@@ -1,8 +1,7 @@
-use noir_bn254_pairing::fp::{Fp, fp_from_limbs_checked};
+use noir_bn254_pairing::fp::fp_from_limbs_checked;
 use noir_bn254_pairing::fp2::Fp2;
 use noir_bn254_pairing::g1::G1Affine;
 use noir_bn254_pairing::g2::G2Affine;
-use noir_bn254_pairing::BigNum;
 use noir_groth16_verify::sp1::{sp1_public_inputs, verify_sp1};
 use noir_groth16_verify::types::Proof;
 
