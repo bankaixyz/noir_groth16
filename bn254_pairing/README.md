@@ -55,6 +55,19 @@ The implementation uses several circuit-friendly optimizations:
 - **Frobenius shortcuts**: final exponentiation uses `frobenius`, `frobenius_square`,
   and `cyclotomic_square` once the element is in the cyclotomic subgroup.
 
+## Utilities
+
+To compute `miller_loop(...)^{-1}` offline for the inverse-assisted APIs, use:
+
+```bash
+python scripts/compute_miller_inverse.py --case single_generators
+```
+
+The script reads `src/tests/bn254_miller_loop_vectors.json` by default and outputs
+both a hex JSON object and a Noir `Fp12` literal. You can point it at your own
+JSON by passing `--input` (it accepts either the vector file format or a flat
+object with the same `c0_b0_a0`...`c1_b2_a1` keys).
+
 ## Performance notes
 
 These figures are measured in a Noir circuit and are intended as rough guidance.
