@@ -7,6 +7,8 @@ path for two public inputs.
 
 - **Groth16 equation**: compute L = IC_0 + sum_i IC_{i+1} * input_i and check
   e(A, B) * e(C, -delta) * e(L, -gamma) = e(alpha, beta) in Fp12.
+- **Proof validation**: verifier enforces on-curve checks, rejects infinity points,
+  and checks G2 subgroup membership for proof points.
 - **Public inputs**: inputs are BN254 scalars; the SP1 path hashes public values
   with SHA256 and masks to 253 bits to stay in the scalar field.
 - **MSM optimization**: the SP1 fast path uses a joint-window MSM (Straus/Shamir)
@@ -21,7 +23,8 @@ Generic verifier:
 SP1 verifier (two inputs):
 
 - `verify_sp1(vkey, public_values, proof) -> bool`
-- `verify_sp1_fast(vk, proof, public_inputs, msm2_w3_table) -> bool`
+- `verify_sp1_fast(proof, public_inputs) -> bool`
+- `verify_sp1_fast_with_table(vk, proof, public_inputs, msm2_w3_table) -> bool`
 
 Core types:
 
@@ -43,6 +46,7 @@ SP1 exposes two public inputs:
 - `input1 = sha256(public_values)` masked to 253 bits
 
 `verify_sp1` computes these inputs and calls the fast verifier path.
+Use `verify_sp1_fast_with_table` only with trusted constant VKs/tables.
 
 ## Optimization notes
 

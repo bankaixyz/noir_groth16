@@ -60,7 +60,7 @@ fn filter_pairs<let N: u32>(
 
 /// Multi-pairing Miller loop for BN254.
 ///
-/// Computes f = ∏_{i=0}^{n-1} f_{x,Q_i}(P_i) using signed NAF digits of x
+/// Computes f = prod_{i=0..n-1} f_{x,Q_i}(P_i) using signed NAF digits of x
 /// (optimal Ate pairing). Uses sparse line multiplication and mixed additions
 /// to reduce Fp12 costs.
 pub fn miller_loop<let N: u32>(p_list: [G1Affine; N], q_list: [G2Affine; N]) -> Fp12 {
@@ -262,7 +262,7 @@ pub fn pairing(p: G1Affine, q: G2Affine) -> Fp12 {
     final_exponentiation(f)
 }
 
-/// Compute product of pairings ∏ e(P_i, Q_i).
+/// Compute product of pairings: prod_i e(P_i, Q_i).
 pub fn pairing_multi<let N: u32>(p_list: [G1Affine; N], q_list: [G2Affine; N]) -> Fp12 {
     let f = miller_loop(p_list, q_list);
     final_exponentiation(f)

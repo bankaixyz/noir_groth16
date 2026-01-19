@@ -44,6 +44,20 @@ pub fn fp_nine() -> Fp {
     Fp::from_limbs([0x9, 0x0, 0x0])
 }
 
+/// Assert each limb fits in 120 bits (canonical limb size).
+pub fn assert_fp_limbs_in_range(limbs: [u128; 3]) {
+    let max: u128 = 1 << 120;
+    assert(limbs[0] < max);
+    assert(limbs[1] < max);
+    assert(limbs[2] < max);
+}
+
+/// Build an Fp element from limbs with range checks.
+pub fn fp_from_limbs_checked(limbs: [u128; 3]) -> Fp {
+    assert_fp_limbs_in_range(limbs);
+    Fp::from_limbs(limbs)
+}
+
 /// BN254 G1 generator x-coordinate.
 pub fn g1_generator_x() -> Fp {
     fp_one()

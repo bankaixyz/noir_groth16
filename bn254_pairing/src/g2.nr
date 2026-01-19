@@ -1,4 +1,4 @@
-use crate::fp::fp_three;
+use crate::fp::{fp_three, seed_x0};
 use crate::fp2::{Fp2, b_twist, endo_u, endo_v, fp2_one, fp2_zero};
 
 /// G2 affine point over Fp2.
@@ -74,6 +74,48 @@ pub fn jacobian_to_affine_g2(p: G2Jac) -> G2Affine {
         let x = p.x.mul(b);
         let y = p.y.mul(b).mul(a);
         G2Affine { x, y }
+    }
+}
+
+/// Convert affine to Jacobian (Z = 1), preserving infinity.
+pub fn g2_affine_to_jacobian(p: G2Affine) -> G2Jac {
+    if p.is_infinity() {
+        g2_jacobian_infinity()
+    } else {
+        G2Jac { x: p.x, y: p.y, z: fp2_one() }
+    }
+}
+
+/// Scalar multiplication by a 128-bit constant using double-and-add.
+pub fn scalar_mul_g2_by_u128(p: G2Jac, scalar: u128) -> G2Jac {
+    let mut acc = g2_jacobian_infinity();
+    let mut base = p;
+    let mut k = scalar;
+    for _ in 0..128 {
+        let bit: u1 = (k & 1) as u1;
+        if bit == 1 {
+            acc = add_g2_jac(acc, base);
+        }
+        base = double_g2_jac(base);
+        k = k >> 1;
+    }
+    acc
+}
+
+/// Subgroup check using the Frobenius endomorphism: psi(P) == [6x^2]P.
+pub fn is_in_correct_subgroup_g2(p: G2Affine) -> bool {
+    if p.is_infinity() {
+        false
+    } else {
+        let p_jac = g2_affine_to_jacobian(p);
+        let psi = psi_g2(p_jac);
+        let x = seed_x0();
+        let x2 = x * x;
+        let k = x2 * 6;
+        let x_p = scalar_mul_g2_by_u128(p_jac, k);
+        let psi_aff = jacobian_to_affine_g2(psi);
+        let x_aff = jacobian_to_affine_g2(x_p);
+        fp2_eq(psi_aff.x, x_aff.x) & fp2_eq(psi_aff.y, x_aff.y)
     }
 }
 
