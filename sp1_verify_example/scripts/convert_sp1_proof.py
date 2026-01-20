@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
+import argparse
 import json
+import subprocess
 import sys
+from pathlib import Path
 
 LIMB_BITS = 120
 LIMB_MASK = (1 << LIMB_BITS) - 1
@@ -20,12 +23,26 @@ def hex_to_bytes(hex_str: str) -> bytes:
     return bytes.fromhex(s)
 
 
-def main():
-    if len(sys.argv) != 2:
-        print("Usage: convert_sp1_proof.py <input.json>", file=sys.stderr)
-        sys.exit(1)
+def load_pairing_check_witness(input_path: str) -> dict:
+    script_path = (
+        Path(__file__).resolve().parents[2]
+        / "groth16_verify"
+        / "scripts"
+        / "compute_sp1_pairing_check_witness.py"
+    )
+    output = subprocess.check_output(
+        [sys.executable, str(script_path), "--proof-json", input_path, "--format", "json"]
+    )
+    return json.loads(output.decode("utf-8"))
 
-    with open(sys.argv[1], "r", encoding="utf-8") as f:
+
+def main():
+    parser = argparse.ArgumentParser(description="Convert SP1 proof JSON to Noir inputs")
+    parser.add_argument("input_json", help="SP1 proof JSON (proof/publicValues/vkey)")
+    parser.add_argument("--no-witness", action="store_true", help="Skip pairing-check witness generation")
+    args = parser.parse_args()
+
+    with open(args.input_json, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     proof_hex = data["proof"]
@@ -83,6 +100,19 @@ def main():
     print("")
     print("# SP1 public values (32 bytes)")
     print(f"public_values = {public_values_bytes}")
+
+    if not args.no_witness:
+        witness = load_pairing_check_witness(args.input_json)
+        print("")
+        print("# PairingCheck witnesses (Fp12)")
+        print("c = [")
+        for row in witness["c"]:
+            print(f'  ["{row[0]}", "{row[1]}", "{row[2]}"],')
+        print("]")
+        print("w = [")
+        for row in witness["w"]:
+            print(f'  ["{row[0]}", "{row[1]}", "{row[2]}"],')
+        print("]")
 
 
 if __name__ == "__main__":
