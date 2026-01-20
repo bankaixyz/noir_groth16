@@ -80,28 +80,28 @@ fn alpha_beta() -> Fp12 {
 /// SP1 pairing-check preimage: FE(t_preimage) = alpha_beta^{-1}.
 pub fn sp1_t_preimage() -> Fp12 {
     let c0_b0 = fp2_from_limbs(
-        [0x7b420c60b525f2c2ce1b86d3dc3a47, 0x5a17324144f5ca03d8895d392e1f0c, 0x2a86],
-        [0xb868080ab2c8a10bd11082150d127e, 0x8902d60c3ba260898ec31a80f239cd, 0x48f],
+        [0xcd880fc71b32452a5324c62edc92c2, 0xb9080b7c2a6afd02d2ab1df32a0de2, 0x1485],
+        [0x600d6ce94a2ec7c946936df26d54d, 0xaab8efdce7292991f6a07f5836e8c, 0x18b3],
     );
     let c0_b1 = fp2_from_limbs(
-        [0x1413871624c083e0d0d9f7474b053b, 0xa5dfca40eafe7bc29574d688d7868b, 0xdf4],
-        [0xb598aee4203cda5bd3ec475ebc05d, 0x57129cf82e823378aaf0ef031d368e, 0xa8d],
+        [0x51f8ec2c3269fdfe8140dd0b4557eb, 0x8fd6a7e00d1ec7b378d5d9066ae94d, 0x1c88],
+        [0x65149e762a0f194bea7177c23b43ce, 0xa195e2d362721d9d07d990d259d149, 0x2435],
     );
     let c0_b2 = fp2_from_limbs(
-        [0x48efb18f71d70ab0d6c95b37409239, 0x754ec3d38dcd5bf6af76d344b122cd, 0xd4b],
-        [0x87e39d995fd0c3dcfa43e0853ea55f, 0x89e6dd2d3afc2315e30ba143f47c24, 0x304e],
+        [0xa3c586b9480262bf5cc25d3299c9fa, 0xc6aeef879e18c66be0c7a3617b7ff8, 0x1795],
+        [0xc3ac98de3d588388fa46f6a10abbee, 0xca6a7134280bba0548ed98abbae202, 0x303f],
     );
     let c1_b0 = fp2_from_limbs(
-        [0x298cbab09bde939f39ccc38c3e318c, 0x35ea04fef8bc069b6f8e6603781e7a, 0x2368],
-        [0xd3bab083cdb5c91855e0901df5f711, 0xcd04ba04b1c347de7f01165c9b34e7, 0x1281],
+        [0x3a5a6e14c8481ef1054c919532fdc, 0xc684f8f7d17b4ce6cf6f761c22881b, 0x25de],
+        [0xa020ffacd4a2b772b45b39cfc94696, 0x212173dd5108b102c149e1e165da20, 0x208f],
     );
     let c1_b1 = fp2_from_limbs(
-        [0x1fa3980da8295955f050bb692a8d41, 0x1d4665534b60afb19700728dda291c, 0xbe3],
-        [0x34bd7c551b4308fda1646559f62643, 0x8bc79905ba6ff916718025803684b6, 0x118b],
+        [0x981bb6b4aba9212db8419418d974fe, 0x312f573162985df20296c1926a5fbe, 0x1a9f],
+        [0xa99a11fb1bd88669a1d30679573243, 0x7e317a16c26c0fa9b4ba83a63a0399, 0xc8e],
     );
     let c1_b2 = fp2_from_limbs(
-        [0x195895c047336e9af7ab69f32981ac, 0xc78eb182f98904fa8b0ab7f3e47693, 0x2fa],
-        [0xe067face779b826d7aa5fa68d04881, 0x8515c249d1583929f91077f85ddb8b, 0x725],
+        [0xd0e1a0ca46f03d2d1b0a8326547e86, 0xd0337602f5b5cf330e166986842f64, 0x1b53],
+        [0xfb2e33c3461cebde7071790717a2bb, 0x9348750ebf1bbd5c4c554a738f1cb, 0x1de0],
     );
     fp12_from(fp6_from(c0_b0, c0_b1, c0_b2), fp6_from(c1_b0, c1_b1, c1_b2))
 }

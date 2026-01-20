@@ -112,14 +112,47 @@ class Fp2:
     def mul_by_non_residue_1_power_2(self) -> "Fp2":
         return self.mul(FROB_1_2)
 
+    def mul_by_non_residue_1_power_1(self) -> "Fp2":
+        return self.mul(FROB_1_1)
+
     def mul_by_non_residue_1_power_3(self) -> "Fp2":
         return self.mul(FROB_1_3)
+
+    def mul_by_non_residue_1_power_4(self) -> "Fp2":
+        return self.mul(FROB_1_4)
+
+    def mul_by_non_residue_1_power_5(self) -> "Fp2":
+        return self.mul(FROB_1_5)
 
     def mul_by_non_residue_2_power_2(self) -> "Fp2":
         return self.mul_by_element(FROB_2_2)
 
+    def mul_by_non_residue_2_power_1(self) -> "Fp2":
+        return self.mul_by_element(FROB_2_1)
+
     def mul_by_non_residue_2_power_3(self) -> "Fp2":
         return self.mul_by_element(FROB_2_3)
+
+    def mul_by_non_residue_2_power_4(self) -> "Fp2":
+        return self.mul_by_element(FROB_2_4)
+
+    def mul_by_non_residue_2_power_5(self) -> "Fp2":
+        return self.mul_by_element(FROB_2_5)
+
+    def mul_by_non_residue_3_power_1(self) -> "Fp2":
+        return self.mul(FROB_3_1)
+
+    def mul_by_non_residue_3_power_2(self) -> "Fp2":
+        return self.mul(FROB_3_2)
+
+    def mul_by_non_residue_3_power_3(self) -> "Fp2":
+        return self.mul(FROB_3_3)
+
+    def mul_by_non_residue_3_power_4(self) -> "Fp2":
+        return self.mul(FROB_3_4)
+
+    def mul_by_non_residue_3_power_5(self) -> "Fp2":
+        return self.mul(FROB_3_5)
 
     def is_zero(self) -> bool:
         return self.c0 == 0 and self.c1 == 0
@@ -312,6 +345,70 @@ class Fp12:
         c1 = ab.double()
         return Fp12(c0, c1)
 
+    def cyclotomic_square(self) -> "Fp12":
+        t0 = self.c1.b1.square()
+        t1 = self.c0.b0.square()
+        t6 = (self.c1.b1.add(self.c0.b0)).square().sub(t0).sub(t1)
+        t2 = self.c0.b2.square()
+        t3 = self.c1.b0.square()
+        t7 = (self.c0.b2.add(self.c1.b0)).square().sub(t2).sub(t3)
+        t4 = self.c1.b2.square()
+        t5 = self.c0.b1.square()
+        t8 = (self.c1.b2.add(self.c0.b1)).square().sub(t4).sub(t5).mul_by_non_residue()
+
+        t0 = t0.mul_by_non_residue().add(t1)
+        t2 = t2.mul_by_non_residue().add(t3)
+        t4 = t4.mul_by_non_residue().add(t5)
+
+        z0 = t0.sub(self.c0.b0).double().add(t0)
+        z1 = t2.sub(self.c0.b1).double().add(t2)
+        z2 = t4.sub(self.c0.b2).double().add(t4)
+
+        z3 = t8.add(self.c1.b0).double().add(t8)
+        z4 = t6.add(self.c1.b1).double().add(t6)
+        z5 = t7.add(self.c1.b2).double().add(t7)
+
+        return Fp12(Fp6(z0, z1, z2), Fp6(z3, z4, z5))
+
+    def n_square(self, n: int) -> "Fp12":
+        result = self
+        for _ in range(n):
+            result = result.cyclotomic_square()
+        return result
+
+    def expt(self) -> "Fp12":
+        x = self
+        t3 = x.cyclotomic_square()
+        t5 = t3.cyclotomic_square()
+        result = t5.cyclotomic_square()
+        t0 = result.cyclotomic_square()
+        t2 = x.mul(t0)
+        t0 = t3.mul(t2)
+        t1 = x.mul(t0)
+        t4 = result.mul(t2)
+        t6 = t2.cyclotomic_square()
+        t1 = t0.mul(t1)
+        t0 = t3.mul(t1)
+        t6 = t6.n_square(6)
+        t5 = t5.mul(t6)
+        t5 = t4.mul(t5)
+        t5 = t5.n_square(7)
+        t4 = t4.mul(t5)
+        t4 = t4.n_square(8)
+        t4 = t4.mul(t0)
+        t3 = t3.mul(t4)
+        t3 = t3.n_square(6)
+        t2 = t2.mul(t3)
+        t2 = t2.n_square(8)
+        t2 = t2.mul(t0)
+        t2 = t2.n_square(6)
+        t2 = t2.mul(t0)
+        t2 = t2.n_square(10)
+        t1 = t1.mul(t2)
+        t1 = t1.n_square(6)
+        t0 = t0.mul(t1)
+        result = result.mul(t0)
+        return result
     def inverse(self) -> "Fp12":
         t0 = self.c0.square()
         t1 = self.c1.square()
@@ -352,13 +449,31 @@ class Fp12:
         return result
 
     def frobenius(self) -> "Fp12":
-        return self.pow(P)
+        t0 = self.c0.b0.conjugate()
+        t1 = self.c0.b1.conjugate().mul_by_non_residue_1_power_2()
+        t2 = self.c0.b2.conjugate().mul_by_non_residue_1_power_4()
+        t3 = self.c1.b0.conjugate().mul_by_non_residue_1_power_1()
+        t4 = self.c1.b1.conjugate().mul_by_non_residue_1_power_3()
+        t5 = self.c1.b2.conjugate().mul_by_non_residue_1_power_5()
+        return Fp12(Fp6(t0, t1, t2), Fp6(t3, t4, t5))
 
     def frobenius_square(self) -> "Fp12":
-        return self.pow(P * P)
+        t0 = self.c0.b0
+        t1 = self.c0.b1.mul_by_non_residue_2_power_2()
+        t2 = self.c0.b2.mul_by_non_residue_2_power_4()
+        t3 = self.c1.b0.mul_by_non_residue_2_power_1()
+        t4 = self.c1.b1.mul_by_non_residue_2_power_3()
+        t5 = self.c1.b2.mul_by_non_residue_2_power_5()
+        return Fp12(Fp6(t0, t1, t2), Fp6(t3, t4, t5))
 
     def frobenius_cube(self) -> "Fp12":
-        return self.pow(P * P * P)
+        t0 = self.c0.b0.conjugate()
+        t1 = self.c0.b1.conjugate().mul_by_non_residue_3_power_2()
+        t2 = self.c0.b2.conjugate().mul_by_non_residue_3_power_4()
+        t3 = self.c1.b0.conjugate().mul_by_non_residue_3_power_1()
+        t4 = self.c1.b1.conjugate().mul_by_non_residue_3_power_3()
+        t5 = self.c1.b2.conjugate().mul_by_non_residue_3_power_5()
+        return Fp12(Fp6(t0, t1, t2), Fp6(t3, t4, t5))
 
 
 def mul_034_by_034(d0: Fp2, d3: Fp2, d4: Fp2, c0: Fp2, c3: Fp2, c4: Fp2) -> List[Fp2]:
@@ -697,8 +812,55 @@ def miller_loop(p_list: List[G1Affine], q_list: List[G2Affine]) -> Fp12:
 
 
 def final_exponentiation(z: Fp12) -> Fp12:
-    exp = (P**12 - 1) // R
-    return z.pow(exp)
+    result = final_exp_easy_part(z)
+    if result.is_one():
+        return result
+    return final_exp_hard_part(result)
+
+
+def final_exp_easy_part(z: Fp12) -> Fp12:
+    t0 = z.conjugate()
+    result = z.inverse()
+    t0 = t0.mul(result)
+    result = t0.frobenius_square().mul(t0)
+    return result
+
+
+def final_exp_hard_part(result: Fp12) -> Fp12:
+    if result.is_one():
+        return result
+    t0 = result.expt()
+    t0 = t0.conjugate()
+    t0 = t0.cyclotomic_square()
+    t1 = t0.cyclotomic_square()
+    t1 = t0.mul(t1)
+
+    t2 = t1.expt()
+    t2 = t2.conjugate()
+
+    t3 = t1.conjugate()
+    t1 = t2.mul(t3)
+
+    t3 = t2.cyclotomic_square()
+    t4 = t3.expt()
+    t4 = t1.mul(t4)
+
+    t3 = t0.mul(t4)
+    t0 = t2.mul(t4)
+    t0 = result.mul(t0)
+
+    t2 = t3.frobenius()
+    t0 = t2.mul(t0)
+
+    t2 = t4.frobenius_square()
+    t0 = t2.mul(t0)
+
+    t2 = result.conjugate()
+    t2 = t2.mul(t3)
+    t2 = t2.frobenius_cube()
+    t0 = t2.mul(t0)
+
+    return t0
 
 
 def modinv(a: int, m: int) -> int:
@@ -772,11 +934,98 @@ def fp12_to_coeffs(z: Fp12) -> List[int]:
     ]
 
 
+def gt_pow(x: Fp12, exponent: int) -> Fp12:
+    result = Fp12.one()
+    base = x
+    exp = exponent
+    while exp > 0:
+        if exp & 1:
+            result = result.mul(base)
+        base = base.cyclotomic_square()
+        exp >>= 1
+    return result
+
+
+def final_exp_exponent_on_gt() -> int:
+    p_mod_r = P % R
+    p2_mod_r = (P * P) % R
+    p3_mod_r = (P * P * P) % R
+
+    def conj(e: int) -> int:
+        return (-e) % R
+
+    def mul(e1: int, e2: int) -> int:
+        return (e1 + e2) % R
+
+    def sq(e: int) -> int:
+        return (2 * e) % R
+
+    def frob(e: int) -> int:
+        return (e * p_mod_r) % R
+
+    def frob2(e: int) -> int:
+        return (e * p2_mod_r) % R
+
+    def frob3(e: int) -> int:
+        return (e * p3_mod_r) % R
+
+    def expt(e: int) -> int:
+        return (e * X) % R
+
+    def easy_part(e: int) -> int:
+        t0 = conj(e)
+        result = conj(e)
+        t0 = mul(t0, result)
+        result = mul(frob2(t0), t0)
+        return result
+
+    def hard_part(e: int) -> int:
+        if e == 0:
+            return 0
+        t0 = expt(e)
+        t0 = conj(t0)
+        t0 = sq(t0)
+        t1 = sq(t0)
+        t1 = mul(t0, t1)
+
+        t2 = expt(t1)
+        t2 = conj(t2)
+
+        t3 = conj(t1)
+        t1 = mul(t2, t3)
+
+        t3 = sq(t2)
+        t4 = expt(t3)
+        t4 = mul(t1, t4)
+
+        t3 = mul(t0, t4)
+        t0 = mul(t2, t4)
+        t0 = mul(e, t0)
+
+        t2 = frob(t3)
+        t0 = mul(t2, t0)
+
+        t2 = frob2(t4)
+        t0 = mul(t2, t0)
+
+        t2 = conj(e)
+        t2 = mul(t2, t3)
+        t2 = frob3(t2)
+        t0 = mul(t2, t0)
+
+        return t0
+
+    return hard_part(easy_part(1))
+
+
 def compute_t_preimage(alpha_beta: Fp12) -> Fp12:
     alpha_beta_inv = alpha_beta.inverse()
-    h = (P**12 - 1) // R
-    k = modinv(h, R)
-    return alpha_beta_inv.pow(k)
+    e = final_exp_exponent_on_gt()
+    k = modinv(e, R)
+    t_preimage = gt_pow(alpha_beta_inv, k)
+    if fp12_to_coeffs(final_exponentiation(t_preimage)) != fp12_to_coeffs(alpha_beta_inv):
+        raise RuntimeError("t_preimage failed FE check")
+    return t_preimage
 
 
 def compute_sp1_public_inputs(vkey: int, public_values: bytes) -> Tuple[int, int]:
@@ -828,7 +1077,7 @@ def compute_linear_combination(input0: int, input1: int) -> G1Affine:
 def compute_witness(a: G1Affine, b: G2Affine, c: G1Affine, input0: int, input1: int) -> Tuple[Fp12, Fp12]:
     l = compute_linear_combination(input0, input1)
     f = miller_loop([a, c, l], [b, SP1_DELTA_NEG, SP1_GAMMA_NEG])
-    f_t = f.mul(SP1_T_PREIMAGE)
+    f_t = f.mul(sp1_t_preimage())
 
     rng = random.Random(0)
     root_27th = find_root_27th(rng)
@@ -901,7 +1150,7 @@ def main() -> None:
 
     if args.print_t_preimage:
         outputs.append("fn sp1_t_preimage() -> Fp12 {")
-        outputs.append(emit_fp12_noir(SP1_T_PREIMAGE))
+        outputs.append(emit_fp12_noir(sp1_t_preimage()))
         outputs.append("}")
 
     if args.proof_json:
@@ -915,7 +1164,7 @@ def main() -> None:
 
         if not args.no_validate:
             f = miller_loop([a, c, compute_linear_combination(input0, input1)], [b, SP1_DELTA_NEG, SP1_GAMMA_NEG])
-            f_t = f.mul(SP1_T_PREIMAGE)
+            f_t = f.mul(sp1_t_preimage())
             if not final_exponentiation(f_t).is_one():
                 raise SystemExit("final exponentiation check failed")
             if not f_t.mul(w_wit) == c_wit.pow(6 * X + 2 + P - P**2 + P**3):
@@ -952,6 +1201,10 @@ def main() -> None:
         print(content)
 
 
+FROB_1_1 = Fp2(
+    fp_from_limbs(0x521E08292F2176D60B35DADCC9E470, 0xB71C2865A7DFE8B99FDD76E68B605C, 0x1284),
+    fp_from_limbs(0x7992778EEEC7E5CA5CF05F80F362AC, 0x96F3B4FAE7E6A6327CFE12150B8E74, 0x2469),
+)
 FROB_1_2 = Fp2(
     fp_from_limbs(0x8CC310C2C3330C99E39557176F553D, 0x47984F7911F74C0BEC3CF559B143B7, 0x2FB3),
     fp_from_limbs(0xAE2A1D0B7C9DCE1665D51C640FCBA2, 0xE55061EBAE204BA4CC8BD75A079432, 0x16C9),
@@ -960,8 +1213,39 @@ FROB_1_3 = Fp2(
     fp_from_limbs(0xAAE0EDA9C95998DC54014671A0135A, 0xF305489AF5DCDC5EC698B6E2F9B9DB, 0x63C),
     fp_from_limbs(0x807DC98FA25BD282D37F632623B0E3, 0x3CBCAC41049A0704B5A7EC796F2B21, 0x7C0),
 )
+FROB_1_4 = Fp2(
+    fp_from_limbs(0x3365F7BE94EC72848A1F55921EA762, 0x4F5E64EEA80180F3C0B75A181E84D3, 0x5B5),
+    fp_from_limbs(0x85D2EA1BDEC763C13B4711CD2B8126, 0x5EDBE7FD8AEE9F3A80B03B0B1C9236, 0x2C14),
+)
+FROB_1_5 = Fp2(
+    fp_from_limbs(0x5C459B55AA1BD32EA2C810EAB7692F, 0xC1E74F798649E93A3661A4353FF442, 0x183),
+    fp_from_limbs(0x80CB99678E2AC024C6B8EE6E0C2C4B, 0xF2CA76FD0675A27FB246C7729F7DB0, 0x12AC),
+)
+FROB_2_1 = fp_from_limbs(0x8F069FBB966E3DE4BD44E5607CFD49, 0x4E72E131A0295E6DD9E7E0ACCCB0C2, 0x3064)
 FROB_2_2 = fp_from_limbs(0x8F069FBB966E3DE4BD44E5607CFD48, 0x4E72E131A0295E6DD9E7E0ACCCB0C2, 0x3064)
 FROB_2_3 = fp_from_limbs(0x816A916871CA8D3C208C16D87CFD46, 0x4E72E131A029B85045B68181585D97, 0x3064)
+FROB_2_4 = fp_from_limbs(0xF263F1ACDB5C4F5763473177FFFFFE, 0x59E26BCEA0D48BACD4, 0x0)
+FROB_2_5 = fp_from_limbs(0xF263F1ACDB5C4F5763473177FFFFFF, 0x59E26BCEA0D48BACD4, 0x0)
+FROB_3_1 = Fp2(
+    fp_from_limbs(0x4CB38DBE55D24AE86F7D391ED4A67F, 0x81CFCC82E4BBEFE9608CD0ACAA9089, 0x19DC),
+    fp_from_limbs(0x3A5E397D439EC7694AA2BF4C0C101, 0xF8B60BE77D7306CBEEE33576139D7F, 0xAB),
+)
+FROB_3_2 = Fp2(
+    fp_from_limbs(0x5FFD3D5D6942D37B746EE87BDCFB6D, 0xE078B755EF0ABAFF1C77959F25AC80, 0x856),
+    fp_from_limbs(0xDF31BF98FF2631380CAB2BAAA586DE, 0xDE41B3D1766FA9F30E6DEC26094F0F, 0x4F1),
+)
+FROB_3_3 = Fp2(
+    fp_from_limbs(0xD689A3BEA870F45FCC8AD066DCE9ED, 0x5B6D9896AA4CDBF17F1DCA9E5EA3BB, 0x2A27),
+    fp_from_limbs(0xECC7D8CF6EBAB94D0CB3B2594C64, 0x11B634F09B8FB14B900E9507E93276, 0x28A4),
+)
+FROB_3_4 = Fp2(
+    fp_from_limbs(0x33094575B06BCB0E1A92BC3CCBF066, 0x8C6611C08DAB19BEE0F7B5B2444EE6, 0xBC5),
+    fp_from_limbs(0x4A9E08737F96E55FE3ED9D730C239F, 0xE999E1910A12FEB0F6EF0CD21D04A4, 0x23D5),
+)
+FROB_3_5 = Fp2(
+    fp_from_limbs(0xD68098967C84A5EBDE847076261B43, 0x9044952C0905711699FA3B4D3F692E, 0x13C4),
+    fp_from_limbs(0x2DDAEA200280211F25041384282499, 0x366A59B1DD0B9FB1B2282A48633D3E, 0x16DB),
+)
 
 B_TWIST = Fp2(
     fp_from_limbs(0xB4C5E559DBEFA33267E6DC24A138E5, 0x9D40CEB8AAAE81BE18991BE06AC3B5, 0x2B14),
@@ -1033,7 +1317,14 @@ SP1_ALPHA_BETA = Fp12(
     ),
 )
 
-SP1_T_PREIMAGE = compute_t_preimage(SP1_ALPHA_BETA)
+SP1_T_PREIMAGE: Fp12 | None = None
+
+
+def sp1_t_preimage() -> Fp12:
+    global SP1_T_PREIMAGE
+    if SP1_T_PREIMAGE is None:
+        SP1_T_PREIMAGE = compute_t_preimage(SP1_ALPHA_BETA)
+    return SP1_T_PREIMAGE
 
 
 if __name__ == "__main__":
