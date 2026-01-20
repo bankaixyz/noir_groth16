@@ -36,11 +36,57 @@ def load_pairing_check_witness(input_path: str) -> dict:
     return json.loads(output.decode("utf-8"))
 
 
-def toml_inline_table(data: dict) -> str:
-    parts = []
-    for key, value in data.items():
-        parts.append(f"{key} = {json.dumps(value)}")
+def toml_limbs(limbs) -> str:
+    return f'["{limbs[0]}", "{limbs[1]}", "{limbs[2]}"]'
+
+
+def toml_fp(limbs) -> str:
+    return f"{{ limbs = {toml_limbs(limbs)} }}"
+
+
+def toml_fp2(fp2) -> str:
+    return f"{{ c0 = {toml_fp(fp2[0])}, c1 = {toml_fp(fp2[1])} }}"
+
+
+def toml_line_eval(line) -> str:
+    return f"{{ r0 = {toml_fp2(line[0])}, r1 = {toml_fp2(line[1])}, r2 = {toml_fp2(line[2])} }}"
+
+
+def toml_line_triplet(triplet) -> str:
+    items = ", ".join(toml_line_eval(line) for line in triplet)
+    return f"[ {items} ]"
+
+
+def toml_g2_proj(p) -> str:
+    return f"{{ x = {toml_fp2(p[0])}, y = {toml_fp2(p[1])}, z = {toml_fp2(p[2])} }}"
+
+
+def toml_double_witness(w) -> str:
+    return f"{{ a = {toml_fp2(w[0])}, b = {toml_fp2(w[1])}, c = {toml_fp2(w[2])}, ee = {toml_fp2(w[3])} }}"
+
+
+def toml_add_witness(w) -> str:
+    names = ["c", "d", "e", "f", "g", "t1", "t2"]
+    parts = [f"{name} = {toml_fp2(value)}" for name, value in zip(names, w)]
     return "{ " + ", ".join(parts) + " }"
+
+
+def toml_line_compute_witness(w) -> str:
+    return f"{{ t2 = {toml_fp2(w[0])} }}"
+
+
+def print_array(name: str, values, formatter) -> None:
+    print(f"{name} = [")
+    for value in values:
+        print(f"  {formatter(value)},")
+    print("]")
+
+
+def print_line_triplet_array(name: str, values) -> None:
+    print(f"{name} = [")
+    for value in values:
+        print(f"  {toml_line_triplet(value)},")
+    print("]")
 
 
 def main():
@@ -122,15 +168,47 @@ def main():
         print("]")
 
         if "lines" in witness:
+            lines = witness["lines"]
             print("")
             print("# Line schedule (evaluated at P)")
-            print(f"lines = {toml_inline_table(witness['lines'])}")
+            print("[lines]")
+            print_array("initial_doubles", lines["initial_doubles"], toml_line_eval)
+            print_array("pre_loop_lines", lines["pre_loop_lines"], toml_line_eval)
+            print_array("pre_loop_adds", lines["pre_loop_adds"], toml_line_eval)
+            print_line_triplet_array("loop_doubles", lines["loop_doubles"])
+            print_line_triplet_array("loop_adds_pos", lines["loop_adds_pos"])
+            print_line_triplet_array("loop_adds_neg", lines["loop_adds_neg"])
+            print_array("final_adds", lines["final_adds"], toml_line_eval)
+            print_array("final_lines", lines["final_lines"], toml_line_eval)
+
+            raw = witness["b_lines_raw"]
             print("")
             print("# Raw line coefficients for B")
-            print(f"b_lines_raw = {toml_inline_table(witness['b_lines_raw'])}")
+            print("[b_lines_raw]")
+            print(f"initial_double = {toml_line_eval(raw['initial_double'])}")
+            print(f"pre_loop_line = {toml_line_eval(raw['pre_loop_line'])}")
+            print(f"pre_loop_add = {toml_line_eval(raw['pre_loop_add'])}")
+            print_array("loop_doubles", raw["loop_doubles"], toml_line_eval)
+            print_array("loop_adds_pos", raw["loop_adds_pos"], toml_line_eval)
+            print_array("loop_adds_neg", raw["loop_adds_neg"], toml_line_eval)
+            print(f"final_add = {toml_line_eval(raw['final_add'])}")
+            print(f"final_line = {toml_line_eval(raw['final_line'])}")
+
+            b_witness = witness["b_line_witness"]
             print("")
             print("# Line witness intermediates for B")
-            print(f"b_line_witness = {toml_inline_table(witness['b_line_witness'])}")
+            print("[b_line_witness]")
+            print_array("double_witnesses", b_witness["double_witnesses"], toml_double_witness)
+            print_array("double_outputs", b_witness["double_outputs"], toml_g2_proj)
+            print(f"pre_loop_line_witness = {toml_line_compute_witness(b_witness['pre_loop_line_witness'])}")
+            print(f"pre_loop_add_witness = {toml_add_witness(b_witness['pre_loop_add_witness'])}")
+            print(f"pre_loop_add_output = {toml_g2_proj(b_witness['pre_loop_add_output'])}")
+            print_array("loop_add_witness_pos", b_witness["loop_add_witness_pos"], toml_add_witness)
+            print_array("loop_add_witness_neg", b_witness["loop_add_witness_neg"], toml_add_witness)
+            print_array("loop_add_outputs", b_witness["loop_add_outputs"], toml_g2_proj)
+            print(f"final_add_witness = {toml_add_witness(b_witness['final_add_witness'])}")
+            print(f"final_add_output = {toml_g2_proj(b_witness['final_add_output'])}")
+            print(f"final_line_witness = {toml_line_compute_witness(b_witness['final_line_witness'])}")
 
 
 if __name__ == "__main__":
