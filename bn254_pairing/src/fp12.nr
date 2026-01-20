@@ -1,6 +1,6 @@
 use crate::fp2::{Fp2, fp2_one, fp2_zero};
 use crate::fp6::{Fp6, fp6_one, fp6_zero};
-use crate::randomized_check::{MulTrace, RandomCheckContext};
+use crate::randomized_check::RandomCheckState;
 
 // Fp12 = Fp6[w] / (w^2 - v)
 /// Quadratic extension field element c0 + c1 * w.
@@ -62,18 +62,17 @@ impl Fp12 {
         self,
         other: Fp12,
         out: Fp12,
-        trace: &mut MulTrace<N>,
-        ctx: &mut RandomCheckContext,
-    ) -> Fp12 {
-        let a = (self.c0.add(self.c1)).mul_checked(other.c0.add(other.c1), trace, ctx);
-        let b = self.c0.mul_checked(other.c0, trace, ctx);
-        let c = self.c1.mul_checked(other.c1, trace, ctx);
+        state: RandomCheckState<N>,
+    ) -> (Fp12, RandomCheckState<N>) {
+        let (a, state) = (self.c0.add(self.c1)).mul_checked(other.c0.add(other.c1), state);
+        let (b, state) = self.c0.mul_checked(other.c0, state);
+        let (c, state) = self.c1.mul_checked(other.c1, state);
 
         let c1 = a.sub(b).sub(c);
         let c0 = c.mul_by_non_residue().add(b);
         let computed = Fp12 { c0, c1 };
         assert_fp12_eq(computed, out);
-        out
+        (out, state)
     }
 
     /// Squaring optimized for Fp12.
@@ -89,19 +88,18 @@ impl Fp12 {
     pub fn square_checked<let N: u32>(
         self,
         out: Fp12,
-        trace: &mut MulTrace<N>,
-        ctx: &mut RandomCheckContext,
-    ) -> Fp12 {
+        state: RandomCheckState<N>,
+    ) -> (Fp12, RandomCheckState<N>) {
         let a = self.c0;
         let b = self.c1;
-        let ab = a.mul_checked(b, trace, ctx);
-        let a_sq = a.square_checked(trace, ctx);
-        let b_sq = b.square_checked(trace, ctx);
+        let (ab, state) = a.mul_checked(b, state);
+        let (a_sq, state) = a.square_checked(state);
+        let (b_sq, state) = b.square_checked(state);
         let c0 = a_sq.add(b_sq.mul_by_non_residue());
         let c1 = ab.double();
         let computed = Fp12 { c0, c1 };
         assert_fp12_eq(computed, out);
-        out
+        (out, state)
     }
 
     /// Inversion via c0^2 - v*c1^2.
@@ -209,19 +207,18 @@ impl Fp12 {
         c3: Fp2,
         c4: Fp2,
         out: Fp12,
-        trace: &mut MulTrace<N>,
-        ctx: &mut RandomCheckContext,
-    ) -> Fp12 {
-        let a = self.c0.mul_by_e2_checked(c0, trace, ctx);
-        let b = self.c1.mul_by_01_checked(c3, c4, trace, ctx);
+        state: RandomCheckState<N>,
+    ) -> (Fp12, RandomCheckState<N>) {
+        let (a, state) = self.c0.mul_by_e2_checked(c0, state);
+        let (b, state) = self.c1.mul_by_01_checked(c3, c4, state);
         let d0 = c0.add(c3);
-        let d = self.c0.add(self.c1).mul_by_01_checked(d0, c4, trace, ctx);
+        let (d, state) = self.c0.add(self.c1).mul_by_01_checked(d0, c4, state);
 
         let c1 = d.sub(a).sub(b);
         let c0 = b.mul_by_non_residue().add(a);
         let computed = Fp12 { c0, c1 };
         assert_fp12_eq(computed, out);
-        out
+        (out, state)
     }
 
     /// Multiply by sparse element with coeffs in slots 3 and 4.
@@ -256,21 +253,20 @@ impl Fp12 {
         self,
         x: [Fp2; 5],
         out: Fp12,
-        trace: &mut MulTrace<N>,
-        ctx: &mut RandomCheckContext,
-    ) -> Fp12 {
+        state: RandomCheckState<N>,
+    ) -> (Fp12, RandomCheckState<N>) {
         let c0 = Fp6 { b0: x[0], b1: x[1], b2: x[2] };
         let c1 = Fp6 { b0: x[3], b1: x[4], b2: fp2_zero() };
 
-        let a = self.c0.add(self.c1).mul_checked(c0.add(c1), trace, ctx);
-        let b = self.c0.mul_checked(c0, trace, ctx);
-        let c = self.c1.mul_by_01_checked(x[3], x[4], trace, ctx);
+        let (a, state) = self.c0.add(self.c1).mul_checked(c0.add(c1), state);
+        let (b, state) = self.c0.mul_checked(c0, state);
+        let (c, state) = self.c1.mul_by_01_checked(x[3], x[4], state);
 
         let c1 = a.sub(b).sub(c);
         let c0 = c.mul_by_non_residue().add(b);
         let computed = Fp12 { c0, c1 };
         assert_fp12_eq(computed, out);
-        out
+        (out, state)
     }
 
     /// Exponentiation by (x) and its powers in the cyclotomic subgroup.

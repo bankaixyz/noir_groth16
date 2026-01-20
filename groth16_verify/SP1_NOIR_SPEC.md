@@ -182,5 +182,6 @@ The randomized entrypoint adds:
   - `muls: [Fp12; 27]`
   - `fp_mul_witnesses: [FpMulWitness; 12702]`
 
-`FpMulWitness` stores limbs for the base-field product `c` and quotient `q`, each as
-three 120-bit limbs. The witness generator pads unused entries with zero values.
+`FpMulWitness` stores limbs for the multiplicands `a`, `b`, the product `c`, and
+quotient `q`, each as three 120-bit limbs. The witness generator pads unused entries
+with zero values.

@@ -1,5 +1,5 @@
 use crate::fp::{Fp, fp_nine, fp_one, fp_two, fp_zero};
-use crate::randomized_check::{check_fp_mul, MulTrace, RandomCheckContext};
+use crate::randomized_check::{check_fp_mul, RandomCheckState};
 use bignum::BigNum;
 
 
@@ -183,18 +183,13 @@ impl Fp2 {
         Fp2 { c0: b - c, c1: a - b - c }
     }
 
-    pub fn mul_checked<let N: u32>(
-        self,
-        other: Fp2,
-        trace: &mut MulTrace<N>,
-        ctx: &mut RandomCheckContext,
-    ) -> Fp2 {
+    pub fn mul_checked<let N: u32>(self, other: Fp2, state: RandomCheckState<N>) -> (Fp2, RandomCheckState<N>) {
         let a0 = self.c0 + self.c1;
         let b0 = other.c0 + other.c1;
-        let a = check_fp_mul(a0, b0, trace.next(), ctx);
-        let b = check_fp_mul(self.c0, other.c0, trace.next(), ctx);
-        let c = check_fp_mul(self.c1, other.c1, trace.next(), ctx);
-        Fp2 { c0: b - c, c1: a - b - c }
+        let (a, state) = check_fp_mul(a0, b0, state);
+        let (b, state) = check_fp_mul(self.c0, other.c0, state);
+        let (c, state) = check_fp_mul(self.c1, other.c1, state);
+        (Fp2 { c0: b - c, c1: a - b - c }, state)
     }
 
     /// Complex squaring in Fp2 using 2 multiplications.
@@ -205,17 +200,13 @@ impl Fp2 {
         Fp2 { c0: a, c1: b }
     }
 
-    pub fn square_checked<let N: u32>(
-        self,
-        trace: &mut MulTrace<N>,
-        ctx: &mut RandomCheckContext,
-    ) -> Fp2 {
+    pub fn square_checked<let N: u32>(self, state: RandomCheckState<N>) -> (Fp2, RandomCheckState<N>) {
         let a0 = self.c0 + self.c1;
         let b0 = self.c0 - self.c1;
-        let a = check_fp_mul(a0, b0, trace.next(), ctx);
-        let b = check_fp_mul(self.c0, self.c1, trace.next(), ctx);
+        let (a, state) = check_fp_mul(a0, b0, state);
+        let (b, state) = check_fp_mul(self.c0, self.c1, state);
         let b = b + b;
-        Fp2 { c0: a, c1: b }
+        (Fp2 { c0: a, c1: b }, state)
     }
 
     /// Inversion via (a0 - a1*u) / (a0^2 + a1^2).
