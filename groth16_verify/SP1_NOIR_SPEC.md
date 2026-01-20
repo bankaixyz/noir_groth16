@@ -183,7 +183,6 @@ The randomized entrypoint adds:
   - `fp_mul_witnesses: [FpMulWitness; 12702]`
 
 `FpMulWitness` stores limbs for the product `c` and quotient `q`, each as three
-120-bit limbs. The circuit does **not** range-check `c` per multiplication; instead,
-it validates the final `Fp12` outputs per checked operation. `q` limbs are used
-as-is for the randomized check. The witness generator pads unused entries with
-zero values.
+120-bit limbs. The circuit does **not** range-check limbs for each multiplication;
+it relies on the randomized checks over limb polynomials. `q` limbs are used as-is
+for the randomized check. The witness generator pads unused entries with zero values.
