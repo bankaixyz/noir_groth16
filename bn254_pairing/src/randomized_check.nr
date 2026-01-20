@@ -37,6 +37,24 @@ pub fn eval_limbs(limbs: [u128; 3], rho: Field) -> Field {
     l0 + l1 * rho + l2 * rho2
 }
 
+pub fn eval_fp(x: Fp, rho: Field) -> Field {
+    eval_limbs(fp_to_limbs(x), rho)
+}
+
+pub fn accumulate_check<let N: u32>(
+    state: RandomCheckState<N>,
+    check: Field,
+) -> RandomCheckState<N> {
+    RandomCheckState {
+        rho: state.rho,
+        alpha: state.alpha,
+        alpha_pow: state.alpha_pow * state.alpha,
+        acc: state.acc + state.alpha_pow * check,
+        fp_mul_witnesses: state.fp_mul_witnesses,
+        idx: state.idx,
+    }
+}
+
 pub fn check_fp_mul<let N: u32>(
     a: Fp,
     b: Fp,

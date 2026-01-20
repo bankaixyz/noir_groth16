@@ -1,6 +1,6 @@
 use crate::fp2::{Fp2, fp2_one, fp2_zero};
 use crate::fp6::{Fp6, fp6_one, fp6_zero};
-use crate::randomized_check::RandomCheckState;
+use crate::randomized_check::{RandomCheckState, accumulate_check, eval_fp};
 
 // Fp12 = Fp6[w] / (w^2 - v)
 /// Quadratic extension field element c0 + c1 * w.
@@ -71,7 +71,7 @@ impl Fp12 {
         let c1 = a.sub(b).sub(c);
         let c0 = c.mul_by_non_residue().add(b);
         let computed = Fp12 { c0, c1 };
-        assert_fp12_eq(computed, out);
+        let state = check_fp12_linear(out, computed, state);
         (out, state)
     }
 
@@ -98,7 +98,7 @@ impl Fp12 {
         let c0 = a_sq.add(b_sq.mul_by_non_residue());
         let c1 = ab.double();
         let computed = Fp12 { c0, c1 };
-        assert_fp12_eq(computed, out);
+        let state = check_fp12_linear(out, computed, state);
         (out, state)
     }
 
@@ -217,7 +217,7 @@ impl Fp12 {
         let c1 = d.sub(a).sub(b);
         let c0 = b.mul_by_non_residue().add(a);
         let computed = Fp12 { c0, c1 };
-        assert_fp12_eq(computed, out);
+        let state = check_fp12_linear(out, computed, state);
         (out, state)
     }
 
@@ -265,7 +265,7 @@ impl Fp12 {
         let c1 = a.sub(b).sub(c);
         let c0 = c.mul_by_non_residue().add(b);
         let computed = Fp12 { c0, c1 };
-        assert_fp12_eq(computed, out);
+        let state = check_fp12_linear(out, computed, state);
         (out, state)
     }
 
@@ -330,6 +330,26 @@ fn assert_fp6_eq(a: Fp6, b: Fp6) {
 fn assert_fp12_eq(a: Fp12, b: Fp12) {
     assert_fp6_eq(a.c0, b.c0);
     assert_fp6_eq(a.c1, b.c1);
+}
+
+fn check_fp12_linear<let N: u32>(
+    out: Fp12,
+    expected: Fp12,
+    state: RandomCheckState<N>,
+) -> RandomCheckState<N> {
+    let mut next = state;
+    next = accumulate_check(next, eval_fp(out.c0.b0.c0, next.rho) - eval_fp(expected.c0.b0.c0, next.rho));
+    next = accumulate_check(next, eval_fp(out.c0.b0.c1, next.rho) - eval_fp(expected.c0.b0.c1, next.rho));
+    next = accumulate_check(next, eval_fp(out.c0.b1.c0, next.rho) - eval_fp(expected.c0.b1.c0, next.rho));
+    next = accumulate_check(next, eval_fp(out.c0.b1.c1, next.rho) - eval_fp(expected.c0.b1.c1, next.rho));
+    next = accumulate_check(next, eval_fp(out.c0.b2.c0, next.rho) - eval_fp(expected.c0.b2.c0, next.rho));
+    next = accumulate_check(next, eval_fp(out.c0.b2.c1, next.rho) - eval_fp(expected.c0.b2.c1, next.rho));
+    next = accumulate_check(next, eval_fp(out.c1.b0.c0, next.rho) - eval_fp(expected.c1.b0.c0, next.rho));
+    next = accumulate_check(next, eval_fp(out.c1.b0.c1, next.rho) - eval_fp(expected.c1.b0.c1, next.rho));
+    next = accumulate_check(next, eval_fp(out.c1.b1.c0, next.rho) - eval_fp(expected.c1.b1.c0, next.rho));
+    next = accumulate_check(next, eval_fp(out.c1.b1.c1, next.rho) - eval_fp(expected.c1.b1.c1, next.rho));
+    next = accumulate_check(next, eval_fp(out.c1.b2.c0, next.rho) - eval_fp(expected.c1.b2.c0, next.rho));
+    accumulate_check(next, eval_fp(out.c1.b2.c1, next.rho) - eval_fp(expected.c1.b2.c1, next.rho))
 }
 
 /// Multiply two sparse line evaluations (coeffs 0,3,4) into 5-slot form.
