@@ -1,5 +1,6 @@
 use crate::fp2::{Fp2, fp2_one, fp2_zero};
 use crate::fp6::{Fp6, fp6_one, fp6_zero};
+use crate::randomized_check::{MulTrace, RandomCheckContext};
 
 // Fp12 = Fp6[w] / (w^2 - v)
 /// Quadratic extension field element c0 + c1 * w.
@@ -57,6 +58,24 @@ impl Fp12 {
         Fp12 { c0, c1 }
     }
 
+    pub fn mul_checked<let N: u32>(
+        self,
+        other: Fp12,
+        out: Fp12,
+        trace: &mut MulTrace<N>,
+        ctx: &mut RandomCheckContext,
+    ) -> Fp12 {
+        let a = (self.c0.add(self.c1)).mul_checked(other.c0.add(other.c1), trace, ctx);
+        let b = self.c0.mul_checked(other.c0, trace, ctx);
+        let c = self.c1.mul_checked(other.c1, trace, ctx);
+
+        let c1 = a.sub(b).sub(c);
+        let c0 = c.mul_by_non_residue().add(b);
+        let computed = Fp12 { c0, c1 };
+        assert_fp12_eq(computed, out);
+        out
+    }
+
     /// Squaring optimized for Fp12.
     pub fn square(self) -> Fp12 {
         let a = self.c0;
@@ -65,6 +84,24 @@ impl Fp12 {
         let c0 = a.square().add(b.square().mul_by_non_residue());
         let c1 = ab.double();
         Fp12 { c0, c1 }
+    }
+
+    pub fn square_checked<let N: u32>(
+        self,
+        out: Fp12,
+        trace: &mut MulTrace<N>,
+        ctx: &mut RandomCheckContext,
+    ) -> Fp12 {
+        let a = self.c0;
+        let b = self.c1;
+        let ab = a.mul_checked(b, trace, ctx);
+        let a_sq = a.square_checked(trace, ctx);
+        let b_sq = b.square_checked(trace, ctx);
+        let c0 = a_sq.add(b_sq.mul_by_non_residue());
+        let c1 = ab.double();
+        let computed = Fp12 { c0, c1 };
+        assert_fp12_eq(computed, out);
+        out
     }
 
     /// Inversion via c0^2 - v*c1^2.
@@ -166,6 +203,27 @@ impl Fp12 {
         Fp12 { c0, c1 }
     }
 
+    pub fn mul_by_034_checked<let N: u32>(
+        self,
+        c0: Fp2,
+        c3: Fp2,
+        c4: Fp2,
+        out: Fp12,
+        trace: &mut MulTrace<N>,
+        ctx: &mut RandomCheckContext,
+    ) -> Fp12 {
+        let a = self.c0.mul_by_e2_checked(c0, trace, ctx);
+        let b = self.c1.mul_by_01_checked(c3, c4, trace, ctx);
+        let d0 = c0.add(c3);
+        let d = self.c0.add(self.c1).mul_by_01_checked(d0, c4, trace, ctx);
+
+        let c1 = d.sub(a).sub(b);
+        let c0 = b.mul_by_non_residue().add(a);
+        let computed = Fp12 { c0, c1 };
+        assert_fp12_eq(computed, out);
+        out
+    }
+
     /// Multiply by sparse element with coeffs in slots 3 and 4.
     pub fn mul_by_34(self, c3: Fp2, c4: Fp2) -> Fp12 {
         let a = self.c0;
@@ -192,6 +250,27 @@ impl Fp12 {
         let c0 = c.mul_by_non_residue().add(b);
 
         Fp12 { c0, c1 }
+    }
+
+    pub fn mul_by_01234_checked<let N: u32>(
+        self,
+        x: [Fp2; 5],
+        out: Fp12,
+        trace: &mut MulTrace<N>,
+        ctx: &mut RandomCheckContext,
+    ) -> Fp12 {
+        let c0 = Fp6 { b0: x[0], b1: x[1], b2: x[2] };
+        let c1 = Fp6 { b0: x[3], b1: x[4], b2: fp2_zero() };
+
+        let a = self.c0.add(self.c1).mul_checked(c0.add(c1), trace, ctx);
+        let b = self.c0.mul_checked(c0, trace, ctx);
+        let c = self.c1.mul_by_01_checked(x[3], x[4], trace, ctx);
+
+        let c1 = a.sub(b).sub(c);
+        let c0 = c.mul_by_non_residue().add(b);
+        let computed = Fp12 { c0, c1 };
+        assert_fp12_eq(computed, out);
+        out
     }
 
     /// Exponentiation by (x) and its powers in the cyclotomic subgroup.
@@ -239,6 +318,22 @@ impl Fp12 {
         }
         result
     }
+}
+
+fn assert_fp2_eq(a: Fp2, b: Fp2) {
+    assert(a.c0 == b.c0);
+    assert(a.c1 == b.c1);
+}
+
+fn assert_fp6_eq(a: Fp6, b: Fp6) {
+    assert_fp2_eq(a.b0, b.b0);
+    assert_fp2_eq(a.b1, b.b1);
+    assert_fp2_eq(a.b2, b.b2);
+}
+
+fn assert_fp12_eq(a: Fp12, b: Fp12) {
+    assert_fp6_eq(a.c0, b.c0);
+    assert_fp6_eq(a.c1, b.c1);
 }
 
 /// Multiply two sparse line evaluations (coeffs 0,3,4) into 5-slot form.

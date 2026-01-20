@@ -58,6 +58,16 @@ pub fn fp_from_limbs_checked(limbs: [u128; 3]) -> Fp {
     Fp::from_limbs(limbs)
 }
 
+/// BN254 base field modulus as limbs.
+pub fn fp_modulus_limbs() -> [u128; 3] {
+    [0x816a916871ca8d3c208c16d87cfd47, 0x4e72e131a029b85045b68181585d97, 0x3064]
+}
+
+/// Convert an Fp element to 120-bit limbs.
+pub fn fp_to_limbs(x: Fp) -> [u128; 3] {
+    x.to_limbs()
+}
+
 /// BN254 G1 generator x-coordinate.
 pub fn g1_generator_x() -> Fp {
     fp_one()

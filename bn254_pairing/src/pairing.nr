@@ -2,6 +2,7 @@ use crate::fp12::{Fp12, fp12_one, mul_034_by_034};
 use crate::fp::{fp_zero};
 use crate::fp2::Fp2;
 use crate::fp6::Fp6;
+use crate::randomized_check::{FpMulWitness, MulTrace, RandomCheckContext, finalize, new_random_check_context};
 use crate::g1::{G1Affine, g1_affine_infinity};
 use crate::g2::{
     G2Affine,
@@ -67,6 +68,14 @@ fn fp2_is_zero(a: Fp2) -> bool {
 
 fn fp6_is_zero(a: Fp6) -> bool {
     fp2_is_zero(a.b0) & fp2_is_zero(a.b1) & fp2_is_zero(a.b2)
+}
+
+pub struct PairingMulTrace<let N: u32> {
+    pub mul_by_034: [Fp12; N * 44],
+    pub mul_by_01234: [Fp12; N * 22],
+    pub squares: [Fp12; 65],
+    pub muls: [Fp12; 27],
+    pub fp_mul_witnesses: [FpMulWitness; N * 2838 + 4188],
 }
 
 /// Multi-pairing Miller loop for BN254.
@@ -349,6 +358,188 @@ fn miller_loop_div_c<let N: u32>(
     result
 }
 
+fn miller_loop_div_c_randomized<let N: u32, let M: u32>(
+    p_list: [G1Affine; N],
+    q_list: [G2Affine; N],
+    c: Fp12,
+    c_inv: Fp12,
+    trace: &PairingMulTrace<N>,
+    mul_trace: &mut MulTrace<M>,
+    idx_mul_by_034: &mut u32,
+    idx_mul_by_01234: &mut u32,
+    idx_square: &mut u32,
+    idx_mul: &mut u32,
+    ctx: &mut RandomCheckContext,
+) -> Fp12 {
+    let (p, q, n) = filter_pairs(p_list, q_list);
+    let mut result = fp12_one();
+
+    if n != 0 {
+        let mut q_proj = [projective_from_affine_g2(g2_affine_infinity()); N];
+        let mut q_neg = [g2_affine_infinity(); N];
+        for i in 0..N {
+            if i < n {
+                q_proj[i] = projective_from_affine_g2(q[i]);
+                q_neg[i] = neg_g2_affine(q[i]);
+            }
+        }
+
+        if n >= 1 {
+            let (q0, line) = q_proj[0].double_step();
+            q_proj[0] = q0;
+            let line = line_eval_at_point(line, p[0]);
+            result.c0.b0 = line.r0;
+            result.c1.b0 = line.r1;
+            result.c1.b1 = line.r2;
+        }
+
+        if n >= 2 {
+            let (q1, line) = q_proj[1].double_step();
+            q_proj[1] = q1;
+            let line = line_eval_at_point(line, p[1]);
+            let prod_lines = mul_034_by_034(
+                line.r0,
+                line.r1,
+                line.r2,
+                result.c0.b0,
+                result.c1.b0,
+                result.c1.b1,
+            );
+            result.c0.b0 = prod_lines[0];
+            result.c0.b1 = prod_lines[1];
+            result.c0.b2 = prod_lines[2];
+            result.c1.b0 = prod_lines[3];
+            result.c1.b1 = prod_lines[4];
+        }
+
+        for k in 2..N {
+            if k < n {
+                let (qk, line) = q_proj[k].double_step();
+                q_proj[k] = qk;
+                let line = line_eval_at_point(line, p[k]);
+                let out = trace.mul_by_034[*idx_mul_by_034];
+                *idx_mul_by_034 = *idx_mul_by_034 + 1;
+                result = result.mul_by_034_checked(line.r0, line.r1, line.r2, out, mul_trace, ctx);
+            }
+        }
+
+        let out = trace.squares[*idx_square];
+        *idx_square = *idx_square + 1;
+        let c_inv_sq = c_inv.square_checked(out, mul_trace, ctx);
+
+        let out = trace.muls[*idx_mul];
+        *idx_mul = *idx_mul + 1;
+        result = result.mul_checked(c_inv_sq, out, mul_trace, ctx);
+
+        let out = trace.squares[*idx_square];
+        *idx_square = *idx_square + 1;
+        result = result.square_checked(out, mul_trace, ctx);
+
+        for k in 0..N {
+            if k < n {
+                let (qk, l2) = q_proj[k].line_compute(q_neg[k]);
+                q_proj[k] = qk;
+                let l2 = line_eval_at_point(l2, p[k]);
+
+                let (qk, l1) = q_proj[k].add_mixed_step(q[k]);
+                q_proj[k] = qk;
+                let l1 = line_eval_at_point(l1, p[k]);
+
+                let prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2);
+                let out = trace.mul_by_01234[*idx_mul_by_01234];
+                *idx_mul_by_01234 = *idx_mul_by_01234 + 1;
+                result = result.mul_by_01234_checked(prod_lines, out, mul_trace, ctx);
+            }
+        }
+
+        let loop_digits = loop_counter();
+        let digit = loop_digits[63];
+        if digit == 1i8 {
+            let out = trace.muls[*idx_mul];
+            *idx_mul = *idx_mul + 1;
+            result = result.mul_checked(c_inv, out, mul_trace, ctx);
+        } else if digit == -1i8 {
+            let out = trace.muls[*idx_mul];
+            *idx_mul = *idx_mul + 1;
+            result = result.mul_checked(c, out, mul_trace, ctx);
+        }
+
+        for idx in 0..63 {
+            let i = 62 - idx;
+            let out = trace.squares[*idx_square];
+            *idx_square = *idx_square + 1;
+            result = result.square_checked(out, mul_trace, ctx);
+
+            for k in 0..N {
+                if k < n {
+                    let (qk, l1) = q_proj[k].double_step();
+                    q_proj[k] = qk;
+                    let l1 = line_eval_at_point(l1, p[k]);
+
+                    if loop_digits[i] == 1i8 {
+                        let (qk, l2) = q_proj[k].add_mixed_step(q[k]);
+                        q_proj[k] = qk;
+                        let l2 = line_eval_at_point(l2, p[k]);
+                        let prod_lines = mul_034_by_034(
+                            l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2,
+                        );
+                        let out = trace.mul_by_01234[*idx_mul_by_01234];
+                        *idx_mul_by_01234 = *idx_mul_by_01234 + 1;
+                        result = result.mul_by_01234_checked(prod_lines, out, mul_trace, ctx);
+                    } else if loop_digits[i] == -1i8 {
+                        let (qk, l2) = q_proj[k].add_mixed_step(q_neg[k]);
+                        q_proj[k] = qk;
+                        let l2 = line_eval_at_point(l2, p[k]);
+                        let prod_lines = mul_034_by_034(
+                            l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2,
+                        );
+                        let out = trace.mul_by_01234[*idx_mul_by_01234];
+                        *idx_mul_by_01234 = *idx_mul_by_01234 + 1;
+                        result = result.mul_by_01234_checked(prod_lines, out, mul_trace, ctx);
+                    } else {
+                        let out = trace.mul_by_034[*idx_mul_by_034];
+                        *idx_mul_by_034 = *idx_mul_by_034 + 1;
+                        result = result.mul_by_034_checked(l1.r0, l1.r1, l1.r2, out, mul_trace, ctx);
+                    }
+                }
+            }
+
+            let digit = loop_digits[i];
+            if digit == 1i8 {
+                let out = trace.muls[*idx_mul];
+                *idx_mul = *idx_mul + 1;
+                result = result.mul_checked(c_inv, out, mul_trace, ctx);
+            } else if digit == -1i8 {
+                let out = trace.muls[*idx_mul];
+                *idx_mul = *idx_mul + 1;
+                result = result.mul_checked(c, out, mul_trace, ctx);
+            }
+        }
+
+        for k in 0..N {
+            if k < n {
+                let q1 = frobenius_g2(q[k]);
+                let q2 = frobenius_square_g2(q[k]);
+
+                let (qk, l2) = q_proj[k].add_mixed_step(q1);
+                q_proj[k] = qk;
+                let l2 = line_eval_at_point(l2, p[k]);
+
+                let (qk, l1) = q_proj[k].line_compute(q2);
+                q_proj[k] = qk;
+                let l1 = line_eval_at_point(l1, p[k]);
+
+                let prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2);
+                let out = trace.mul_by_01234[*idx_mul_by_01234];
+                *idx_mul_by_01234 = *idx_mul_by_01234 + 1;
+                result = result.mul_by_01234_checked(prod_lines, out, mul_trace, ctx);
+            }
+        }
+    }
+
+    result
+}
+
 /// Final exponentiation easy part: z^{p^6-1} * z^{p^2+1}.
 pub fn final_exp_easy_part(z: Fp12) -> Fp12 {
     let t0 = z.conjugate();
@@ -447,4 +638,61 @@ pub fn pairing_check_with_preimage<let N: u32>(
     acc = acc.mul(c_inv.frobenius_cube());
 
     w_in_fp6 & acc.is_one()
+}
+
+pub fn pairing_check_with_preimage_randomized<let N: u32>(
+    p_list: [G1Affine; N],
+    q_list: [G2Affine; N],
+    t_preimage: Fp12,
+    c: Fp12,
+    w: Fp12,
+    rho: Field,
+    alpha: Field,
+    trace: PairingMulTrace<N>,
+) -> bool {
+    let c_inv = c.inverse();
+    let mut ctx = new_random_check_context(rho, alpha);
+    let mut mul_trace = MulTrace::new(trace.fp_mul_witnesses);
+    let mut idx_mul_by_034 = 0;
+    let mut idx_mul_by_01234 = 0;
+    let mut idx_square = 0;
+    let mut idx_mul = 0;
+
+    let f_div_c = miller_loop_div_c_randomized(
+        p_list,
+        q_list,
+        c,
+        c_inv,
+        &trace,
+        &mut mul_trace,
+        &mut idx_mul_by_034,
+        &mut idx_mul_by_01234,
+        &mut idx_square,
+        &mut idx_mul,
+        &mut ctx,
+    );
+
+    let out = trace.muls[idx_mul];
+    idx_mul = idx_mul + 1;
+    let f_t = f_div_c.mul_checked(t_preimage, out, &mut mul_trace, &mut ctx);
+
+    let w_in_fp6 = fp6_is_zero(w.c1);
+    let out = trace.muls[idx_mul];
+    idx_mul = idx_mul + 1;
+    let mut acc = f_t.mul_checked(w, out, &mut mul_trace, &mut ctx);
+
+    let out = trace.muls[idx_mul];
+    idx_mul = idx_mul + 1;
+    acc = acc.mul_checked(c_inv.frobenius(), out, &mut mul_trace, &mut ctx);
+
+    let out = trace.muls[idx_mul];
+    idx_mul = idx_mul + 1;
+    acc = acc.mul_checked(c.frobenius_square(), out, &mut mul_trace, &mut ctx);
+
+    let out = trace.muls[idx_mul];
+    idx_mul = idx_mul + 1;
+    acc = acc.mul_checked(c_inv.frobenius_cube(), out, &mut mul_trace, &mut ctx);
+
+    let checks_ok = finalize(ctx);
+    w_in_fp6 & acc.is_one() & checks_ok
 }

@@ -1,4 +1,5 @@
 use crate::fp2::{Fp2, fp2_one, fp2_zero};
+use crate::randomized_check::{MulTrace, RandomCheckContext};
 
 // Fp6 = Fp2[v] / (v^3 - xi), xi = 9 + u
 /// Cubic extension field element b0 + b1 * v + b2 * v^2.
@@ -62,6 +63,19 @@ impl Fp6 {
         }
     }
 
+    pub fn mul_by_e2_checked<let N: u32>(
+        self,
+        c0: Fp2,
+        trace: &mut MulTrace<N>,
+        ctx: &mut RandomCheckContext,
+    ) -> Fp6 {
+        Fp6 {
+            b0: self.b0.mul_checked(c0, trace, ctx),
+            b1: self.b1.mul_checked(c0, trace, ctx),
+            b2: self.b2.mul_checked(c0, trace, ctx),
+        }
+    }
+
     /// Karatsuba multiplication in Fp6 (3 Fp2 muls + non-residue).
     pub fn mul(self, other: Fp6) -> Fp6 {
         let t0 = self.b0.mul(other.b0);
@@ -83,6 +97,31 @@ impl Fp6 {
         Fp6 { b0: c0, b1: c1, b2: c2 }
     }
 
+    pub fn mul_checked<let N: u32>(
+        self,
+        other: Fp6,
+        trace: &mut MulTrace<N>,
+        ctx: &mut RandomCheckContext,
+    ) -> Fp6 {
+        let t0 = self.b0.mul_checked(other.b0, trace, ctx);
+        let t1 = self.b1.mul_checked(other.b1, trace, ctx);
+        let t2 = self.b2.mul_checked(other.b2, trace, ctx);
+
+        let mut c0 = (self.b1.add(self.b2)).mul_checked(other.b1.add(other.b2), trace, ctx);
+        c0 = c0.sub(t1).sub(t2);
+        c0 = c0.mul_by_non_residue().add(t0);
+
+        let mut c1 = (self.b0.add(self.b1)).mul_checked(other.b0.add(other.b1), trace, ctx);
+        c1 = c1.sub(t0).sub(t1);
+        let tmp = t2.mul_by_non_residue();
+        c1 = c1.add(tmp);
+
+        let mut c2 = (self.b0.add(self.b2)).mul_checked(other.b0.add(other.b2), trace, ctx);
+        c2 = c2.sub(t0).sub(t2).add(t1);
+
+        Fp6 { b0: c0, b1: c1, b2: c2 }
+    }
+
     /// Squaring optimized for Fp6 (symmetric Karatsuba).
     pub fn square(self) -> Fp6 {
         let c4 = self.b0.mul(self.b1).double();
@@ -93,6 +132,21 @@ impl Fp6 {
         let mut c4 = self.b0.sub(self.b1).add(self.b2);
         let c5 = self.b1.mul(self.b2).double();
         c4 = c4.square();
+        let c0 = c5.mul_by_non_residue().add(c3);
+
+        let b2 = c2.add(c4).add(c5).sub(c3);
+        Fp6 { b0: c0, b1: c1, b2 }
+    }
+
+    pub fn square_checked<let N: u32>(self, trace: &mut MulTrace<N>, ctx: &mut RandomCheckContext) -> Fp6 {
+        let c4 = self.b0.mul_checked(self.b1, trace, ctx).double();
+        let c5 = self.b2.square_checked(trace, ctx);
+        let c1 = c5.mul_by_non_residue().add(c4);
+        let c2 = c4.sub(c5);
+        let c3 = self.b0.square_checked(trace, ctx);
+        let mut c4 = self.b0.sub(self.b1).add(self.b2);
+        let c5 = self.b1.mul_checked(self.b2, trace, ctx).double();
+        c4 = c4.square_checked(trace, ctx);
         let c0 = c5.mul_by_non_residue().add(c3);
 
         let b2 = c2.add(c4).add(c5).sub(c3);
@@ -136,6 +190,30 @@ impl Fp6 {
 
         let mut t1 = c0.add(c1);
         t1 = t1.mul(self.b0.add(self.b1));
+        t1 = t1.sub(a).sub(b);
+
+        Fp6 { b0: t0, b1: t1, b2: t2 }
+    }
+
+    pub fn mul_by_01_checked<let N: u32>(
+        self,
+        c0: Fp2,
+        c1: Fp2,
+        trace: &mut MulTrace<N>,
+        ctx: &mut RandomCheckContext,
+    ) -> Fp6 {
+        let a = self.b0.mul_checked(c0, trace, ctx);
+        let b = self.b1.mul_checked(c1, trace, ctx);
+
+        let mut t0 = c1.mul_checked(self.b1.add(self.b2), trace, ctx);
+        t0 = t0.sub(b).mul_by_non_residue();
+        t0 = t0.add(a);
+
+        let mut t2 = c0.mul_checked(self.b0.add(self.b2), trace, ctx);
+        t2 = t2.sub(a).add(b);
+
+        let mut t1 = c0.add(c1);
+        t1 = t1.mul_checked(self.b0.add(self.b1), trace, ctx);
         t1 = t1.sub(a).sub(b);
 
         Fp6 { b0: t0, b1: t1, b2: t2 }
