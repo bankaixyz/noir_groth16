@@ -8,8 +8,10 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import random
 import sys
+import time
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple
 
@@ -672,6 +674,14 @@ class LineEvaluation:
     r2: Fp2
 
 
+def fp2_sample_hex(z: Fp2) -> dict:
+    return {"c0": hex(z.c0), "c1": hex(z.c1)}
+
+
+def line_sample_hex(line: LineEvaluation) -> dict:
+    return {"r0": fp2_sample_hex(line.r0), "r1": fp2_sample_hex(line.r1), "r2": fp2_sample_hex(line.r2)}
+
+
 @dataclass(frozen=True)
 class LineScheduleRaw:
     initial_double: LineEvaluation
@@ -747,6 +757,341 @@ def line_eval_at_point(line: LineEvaluation, p: G1Affine) -> LineEvaluation:
         r1=line.r1.mul_by_element(p.x),
         r2=line.r2,
     )
+
+
+def fp2_eq(a: Fp2, b: Fp2) -> bool:
+    return a.c0 == b.c0 and a.c1 == b.c1
+
+
+def fp2_compress(a: Fp2, rho: int) -> int:
+    return (a.c0 + fp_mul(a.c1, rho)) % P
+
+
+def fp2_mul_compressed_check(a: Fp2, b: Fp2, c: Fp2, rho: int) -> bool:
+    return fp_mul(fp2_compress(a, rho), fp2_compress(b, rho)) == fp2_compress(c, rho)
+
+
+def fp2_mul_check_full(a: Fp2, b: Fp2, c: Fp2) -> bool:
+    prod = a.mul(b)
+    return fp2_eq(prod, c)
+
+
+def line_eval_matches_p(line: LineEvaluation, eval_line: LineEvaluation, p: G1Affine) -> bool:
+    expected = line_eval_at_point(line, p)
+    return fp2_eq(expected.r0, eval_line.r0) and fp2_eq(expected.r1, eval_line.r1) and fp2_eq(expected.r2, eval_line.r2)
+
+
+def g2_proj_eq(a: G2Proj, b: G2Proj) -> bool:
+    return fp2_eq(a.x, b.x) and fp2_eq(a.y, b.y) and fp2_eq(a.z, b.z)
+
+
+def check_double_step_witness(
+    p: G1Affine,
+    state: G2Proj,
+    state_next: G2Proj,
+    line: LineEvaluation,
+    line_eval: LineEvaluation,
+    wit: G2DoubleStepWitness,
+    rho: int,
+) -> bool:
+    ok = line_eval_matches_p(line, line_eval, p)
+
+    inv_two = fp_inv(2)
+    inv_three = fp_inv(3)
+
+    a = wit.a
+    b = wit.b
+    c = wit.c
+    ee = wit.ee
+
+    h = line.r0.neg()
+    j = line.r1.mul_by_element(inv_three)
+    e = line.r2.add(b)
+    d = c.mul_by_element(3)
+    f = e.mul_by_element(3)
+    k = ee.mul_by_element(3)
+    g = b.add(f).mul_by_element(inv_two)
+
+    ok = ok and fp2_mul_compressed_check(state.x, state.y, a.double(), rho)
+    ok = ok and fp2_mul_compressed_check(state.y, state.y, b, rho)
+    ok = ok and fp2_mul_compressed_check(state.z, state.z, c, rho)
+    ok = ok and fp2_mul_compressed_check(d, B_TWIST, e, rho)
+    ok = ok and fp2_mul_compressed_check(state.x, state.x, j, rho)
+    ok = ok and fp2_mul_compressed_check(e, e, ee, rho)
+
+    yz = state.y.add(state.z)
+    rhs_h = b.add(c).sub(line.r0)
+    ok = ok and fp2_mul_compressed_check(yz, yz, rhs_h, rho)
+
+    b_minus_f = b.sub(f)
+    ok = ok and fp2_mul_compressed_check(b_minus_f, a, state_next.x, rho)
+
+    y_rhs = state_next.y.add(k)
+    ok = ok and fp2_mul_compressed_check(g, g, y_rhs, rho)
+
+    ok = ok and fp2_mul_compressed_check(b, h, state_next.z, rho)
+
+    return ok
+
+
+def check_double_step_witness_detail(
+    p: G1Affine,
+    state: G2Proj,
+    state_next: G2Proj,
+    line: LineEvaluation,
+    line_eval: LineEvaluation,
+    wit: G2DoubleStepWitness,
+    rho: int,
+) -> Tuple[bool, dict]:
+    detail = {
+        "line_eval_ok": line_eval_matches_p(line, line_eval, p),
+        "rho_sq_plus_one_zero": (fp_mul(rho, rho) + 1) % P == 0,
+        "first_fail": "",
+        "first_fail_compressed_ok": True,
+        "first_fail_full_ok": True,
+    }
+
+    inv_two = fp_inv(2)
+    inv_three = fp_inv(3)
+
+    a = wit.a
+    b = wit.b
+    c = wit.c
+    ee = wit.ee
+
+    h = line.r0.neg()
+    j = line.r1.mul_by_element(inv_three)
+    e = line.r2.add(b)
+    d = c.mul_by_element(3)
+    f = e.mul_by_element(3)
+    k = ee.mul_by_element(3)
+    g = b.add(f).mul_by_element(inv_two)
+
+    checks = [
+        ("state_x_y_eq_a2", state.x, state.y, a.double()),
+        ("state_y_y_eq_b", state.y, state.y, b),
+        ("state_z_z_eq_c", state.z, state.z, c),
+        ("d_mul_btwist_eq_e", d, B_TWIST, e),
+        ("state_x_x_eq_j", state.x, state.x, j),
+        ("e_e_eq_ee", e, e, ee),
+        ("yz_yz_eq_rhs_h", state.y.add(state.z), state.y.add(state.z), b.add(c).sub(line.r0)),
+        ("b_minus_f_mul_a_eq_x", b.sub(f), a, state_next.x),
+        ("g_g_eq_y_rhs", g, g, state_next.y.add(k)),
+        ("b_h_eq_z", b, h, state_next.z),
+    ]
+
+    for name, left, right, expected in checks:
+        compressed_ok = fp2_mul_compressed_check(left, right, expected, rho)
+        full_ok = fp2_mul_check_full(left, right, expected)
+        if not compressed_ok and detail["first_fail"] == "":
+            detail["first_fail"] = name
+            detail["first_fail_compressed_ok"] = compressed_ok
+            detail["first_fail_full_ok"] = full_ok
+
+    ok = detail["line_eval_ok"]
+    for name, left, right, expected in checks:
+        ok = ok and fp2_mul_compressed_check(left, right, expected, rho)
+
+    return ok, detail
+
+
+def check_add_step_witness(
+    p: G1Affine,
+    state: G2Proj,
+    state_next: G2Proj,
+    a_aff: G2Affine,
+    line: LineEvaluation,
+    line_eval: LineEvaluation,
+    wit: G2AddStepWitness,
+    rho: int,
+) -> bool:
+    ok = line_eval_matches_p(line, line_eval, p)
+
+    l = line.r0
+    o = line.r1.neg()
+    j = line.r2
+
+    x2z1 = state.x.sub(l)
+    y2z1 = state.y.sub(o)
+    ok = ok and fp2_mul_compressed_check(a_aff.x, state.z, x2z1, rho)
+    ok = ok and fp2_mul_compressed_check(a_aff.y, state.z, y2z1, rho)
+
+    ok = ok and fp2_mul_compressed_check(l, a_aff.y, wit.t2, rho)
+    ok = ok and fp2_mul_compressed_check(a_aff.x, o, j.add(wit.t2), rho)
+
+    ok = ok and fp2_mul_compressed_check(o, o, wit.c, rho)
+    ok = ok and fp2_mul_compressed_check(l, l, wit.d, rho)
+    ok = ok and fp2_mul_compressed_check(l, wit.d, wit.e, rho)
+    ok = ok and fp2_mul_compressed_check(state.z, wit.c, wit.f, rho)
+    ok = ok and fp2_mul_compressed_check(state.x, wit.d, wit.g, rho)
+    ok = ok and fp2_mul_compressed_check(state.y, wit.e, wit.t1, rho)
+
+    h = wit.e.add(wit.f).sub(wit.g.double())
+    ok = ok and fp2_mul_compressed_check(l, h, state_next.x, rho)
+
+    y_rhs = state_next.y.add(wit.t1)
+    ok = ok and fp2_mul_compressed_check(wit.g.sub(h), o, y_rhs, rho)
+
+    ok = ok and fp2_mul_compressed_check(wit.e, state.z, state_next.z, rho)
+
+    return ok
+
+
+def check_line_compute_witness(
+    p: G1Affine,
+    state: G2Proj,
+    a_aff: G2Affine,
+    line: LineEvaluation,
+    line_eval: LineEvaluation,
+    wit: G2LineComputeWitness,
+    rho: int,
+) -> bool:
+    ok = line_eval_matches_p(line, line_eval, p)
+
+    l = line.r0
+    o = line.r1.neg()
+    j = line.r2
+
+    x2z1 = state.x.sub(l)
+    y2z1 = state.y.sub(o)
+    ok = ok and fp2_mul_compressed_check(a_aff.x, state.z, x2z1, rho)
+    ok = ok and fp2_mul_compressed_check(a_aff.y, state.z, y2z1, rho)
+
+    ok = ok and fp2_mul_compressed_check(l, a_aff.y, wit.t2, rho)
+    ok = ok and fp2_mul_compressed_check(a_aff.x, o, j.add(wit.t2), rho)
+
+    return ok
+
+
+def check_b_line_witness_sp1_offchain(
+    p: G1Affine,
+    q: G2Affine,
+    raw_lines: "LineScheduleRaw",
+    eval_lines: "LineScheduleRaw",
+    witness: G2LineWitness,
+    rho: int,
+) -> Tuple[bool, str, dict]:
+    q_neg = q.neg()
+    q1 = frobenius_g2(q)
+    q2 = frobenius_square_g2(q)
+    detail: dict = {}
+
+    state = projective_from_affine_g2(q)
+    double0 = witness.double_outputs[0]
+    ok0, detail0 = check_double_step_witness_detail(
+        p,
+        state,
+        double0,
+        raw_lines.initial_double,
+        eval_lines.initial_double,
+        witness.double_witnesses[0],
+        rho,
+    )
+    detail["double_step_0"] = detail0
+    if not ok0:
+        return False, "double_step idx=0", detail
+    state = double0
+
+    if not check_line_compute_witness(
+        p,
+        state,
+        q_neg,
+        raw_lines.pre_loop_line,
+        eval_lines.pre_loop_line,
+        witness.pre_loop_line_witness,
+        rho,
+    ):
+        return False, "pre_loop_line", detail
+
+    pre_loop_add_out = witness.pre_loop_add_output
+    if not check_add_step_witness(
+        p,
+        state,
+        pre_loop_add_out,
+        q,
+        raw_lines.pre_loop_add,
+        eval_lines.pre_loop_add,
+        witness.pre_loop_add_witness,
+        rho,
+    ):
+        return False, "pre_loop_add", detail
+    state = pre_loop_add_out
+
+    digits = loop_counter()
+    for idx in range(63):
+        digit = digits[62 - idx]
+        double_out = witness.double_outputs[idx + 1]
+        if not check_double_step_witness(
+            p,
+            state,
+            double_out,
+            raw_lines.loop_doubles[idx],
+            eval_lines.loop_doubles[idx],
+            witness.double_witnesses[idx + 1],
+            rho,
+        ):
+            return False, f"loop_double idx={idx}", detail
+
+        if digit == 1:
+            add_out = witness.loop_add_outputs[idx]
+            if not check_add_step_witness(
+                p,
+                double_out,
+                add_out,
+                q,
+                raw_lines.loop_adds_pos[idx],
+                eval_lines.loop_adds_pos[idx],
+                witness.loop_add_witness_pos[idx],
+                rho,
+            ):
+                return False, f"loop_add_pos idx={idx}", detail
+            state = add_out
+        elif digit == -1:
+            add_out = witness.loop_add_outputs[idx]
+            if not check_add_step_witness(
+                p,
+                double_out,
+                add_out,
+                q_neg,
+                raw_lines.loop_adds_neg[idx],
+                eval_lines.loop_adds_neg[idx],
+                witness.loop_add_witness_neg[idx],
+                rho,
+            ):
+                return False, f"loop_add_neg idx={idx}", detail
+            state = add_out
+        else:
+            add_out = witness.loop_add_outputs[idx]
+            if not g2_proj_eq(double_out, add_out):
+                return False, f"loop_add_zero idx={idx}", detail
+            state = add_out
+
+    final_add_out = witness.final_add_output
+    if not check_add_step_witness(
+        p,
+        state,
+        final_add_out,
+        q1,
+        raw_lines.final_add,
+        eval_lines.final_add,
+        witness.final_add_witness,
+        rho,
+    ):
+        return False, "final_add", detail
+    state = final_add_out
+
+    if not check_line_compute_witness(
+        p,
+        state,
+        q2,
+        raw_lines.final_line,
+        eval_lines.final_line,
+        witness.final_line_witness,
+        rho,
+    ):
+        return False, "final_line", detail
+
+    return True, "", detail
 
 
 def zero_line() -> LineEvaluation:
@@ -1243,6 +1588,93 @@ def fp12_to_coeffs(z: Fp12) -> List[int]:
         z.c1.b2.c0,
         z.c1.b2.c1,
     ]
+
+
+def fp12_sample_hex(z: Fp12, count: int = 2) -> List[str]:
+    coeffs = fp12_to_coeffs(z)
+    return [hex(c) for c in coeffs[:count]]
+
+
+def derive_rho_sp1_from_limbs(input0: int, input1: int, limb_sets: List[Tuple[int, int, int]]) -> int:
+    data = bytearray(448)
+    offset = 0
+
+    data[offset:offset + 32] = input0.to_bytes(32, "little")
+    offset += 32
+    data[offset:offset + 32] = input1.to_bytes(32, "little")
+    offset += 32
+
+    for limbs in limb_sets:
+        for limb in limbs:
+            data[offset:offset + 16] = limb.to_bytes(16, "little")
+            offset += 16
+
+    digest = hashlib.sha256(data).digest()
+    return int.from_bytes(digest, "big") % P
+
+
+def miller_loop_with_lines_sp1_eval(
+    eval_b: "LineScheduleRaw",
+    eval_delta: "LineScheduleRaw",
+    eval_gamma: "LineScheduleRaw",
+) -> Fp12:
+    schedules = [eval_b, eval_delta, eval_gamma]
+    result = Fp12.one()
+
+    line0 = schedules[0].initial_double
+    result = Fp12(
+        Fp6(line0.r0, fp2_zero(), fp2_zero()),
+        Fp6(line0.r1, line0.r2, fp2_zero()),
+    )
+
+    line1 = schedules[1].initial_double
+    prod_lines = mul_034_by_034(
+        line1.r0,
+        line1.r1,
+        line1.r2,
+        result.c0.b0,
+        result.c1.b0,
+        result.c1.b1,
+    )
+    result = Fp12(
+        Fp6(prod_lines[0], prod_lines[1], prod_lines[2]),
+        Fp6(prod_lines[3], prod_lines[4], fp2_zero()),
+    )
+
+    line2 = schedules[2].initial_double
+    result = result.mul_by_034(line2.r0, line2.r1, line2.r2)
+
+    result = result.square()
+    for k in range(3):
+        l2 = schedules[k].pre_loop_line
+        l1 = schedules[k].pre_loop_add
+        prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2)
+        result = result.mul_by_01234(prod_lines)
+
+    digits = loop_counter()
+    for idx in range(63):
+        digit = digits[62 - idx]
+        result = result.square()
+        for k in range(3):
+            l1 = schedules[k].loop_doubles[idx]
+            if digit == 1:
+                l2 = schedules[k].loop_adds_pos[idx]
+                prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2)
+                result = result.mul_by_01234(prod_lines)
+            elif digit == -1:
+                l2 = schedules[k].loop_adds_neg[idx]
+                prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2)
+                result = result.mul_by_01234(prod_lines)
+            else:
+                result = result.mul_by_034(l1.r0, l1.r1, l1.r2)
+
+    for k in range(3):
+        l2 = schedules[k].final_add
+        l1 = schedules[k].final_line
+        prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2)
+        result = result.mul_by_01234(prod_lines)
+
+    return result
 
 
 def gt_pow(x: Fp12, exponent: int) -> Fp12:

@@ -105,10 +105,13 @@ fn fp2_compress(a: Fp2, rho: Fp) -> Fp {
 }
 
 fn fp2_mul_compressed_check(a: Fp2, b: Fp2, c: Fp2, rho: Fp) -> bool {
-    let a_c = fp2_compress(a, rho);
-    let b_c = fp2_compress(b, rho);
-    let c_c = fp2_compress(c, rho);
-    a_c * b_c == c_c
+    // Random linear combination of the two Fp2 equations using rho.
+    let t0 = a.c0 * b.c0;
+    let t1 = a.c1 * b.c1;
+    let t2 = (a.c0 + a.c1) * (b.c0 + b.c1) - t0 - t1;
+    let left = t0 - t1 + t2 * rho;
+    let right = c.c0 + c.c1 * rho;
+    left == right
 }
 
 fn check_double_step_witness(
