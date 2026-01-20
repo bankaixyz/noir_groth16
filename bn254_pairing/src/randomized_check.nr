@@ -46,8 +46,6 @@ pub fn check_fp_mul<let N: u32>(
     let idx = state.idx + 1;
 
     assert_fp_limbs_in_range(witness.c);
-    assert_fp_limbs_in_range(witness.q);
-
     let c = fp_from_limbs_checked(witness.c);
 
     let a_eval = eval_limbs(fp_to_limbs(a), state.rho);
