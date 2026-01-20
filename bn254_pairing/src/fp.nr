@@ -58,6 +58,11 @@ pub fn fp_from_limbs_checked(limbs: [u128; 3]) -> Fp {
     Fp::from_limbs(limbs)
 }
 
+/// Build an Fp element from limbs without range checks.
+pub fn fp_from_limbs_unchecked(limbs: [u128; 3]) -> Fp {
+    Fp::from_limbs(limbs)
+}
+
 /// BN254 base field modulus as limbs.
 pub fn fp_modulus_limbs() -> [u128; 3] {
     [0x816a916871ca8d3c208c16d87cfd47, 0x4e72e131a029b85045b68181585d97, 0x3064]

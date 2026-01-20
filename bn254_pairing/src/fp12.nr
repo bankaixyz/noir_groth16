@@ -72,6 +72,7 @@ impl Fp12 {
         let c0 = c.mul_by_non_residue().add(b);
         let computed = Fp12 { c0, c1 };
         let state = check_fp12_linear(out, computed, state);
+        assert_fp12_in_field(out);
         (out, state)
     }
 
@@ -99,6 +100,7 @@ impl Fp12 {
         let c1 = ab.double();
         let computed = Fp12 { c0, c1 };
         let state = check_fp12_linear(out, computed, state);
+        assert_fp12_in_field(out);
         (out, state)
     }
 
@@ -218,6 +220,7 @@ impl Fp12 {
         let c0 = b.mul_by_non_residue().add(a);
         let computed = Fp12 { c0, c1 };
         let state = check_fp12_linear(out, computed, state);
+        assert_fp12_in_field(out);
         (out, state)
     }
 
@@ -266,6 +269,7 @@ impl Fp12 {
         let c0 = c.mul_by_non_residue().add(b);
         let computed = Fp12 { c0, c1 };
         let state = check_fp12_linear(out, computed, state);
+        assert_fp12_in_field(out);
         (out, state)
     }
 
@@ -330,6 +334,21 @@ fn assert_fp6_eq(a: Fp6, b: Fp6) {
 fn assert_fp12_eq(a: Fp12, b: Fp12) {
     assert_fp6_eq(a.c0, b.c0);
     assert_fp6_eq(a.c1, b.c1);
+}
+
+fn assert_fp12_in_field(a: Fp12) {
+    a.c0.b0.c0.validate_in_field();
+    a.c0.b0.c1.validate_in_field();
+    a.c0.b1.c0.validate_in_field();
+    a.c0.b1.c1.validate_in_field();
+    a.c0.b2.c0.validate_in_field();
+    a.c0.b2.c1.validate_in_field();
+    a.c1.b0.c0.validate_in_field();
+    a.c1.b0.c1.validate_in_field();
+    a.c1.b1.c0.validate_in_field();
+    a.c1.b1.c1.validate_in_field();
+    a.c1.b2.c0.validate_in_field();
+    a.c1.b2.c1.validate_in_field();
 }
 
 fn check_fp12_linear<let N: u32>(

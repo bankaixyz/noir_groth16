@@ -1,4 +1,4 @@
-use crate::fp::{Fp, assert_fp_limbs_in_range, fp_from_limbs_checked, fp_modulus_limbs, fp_to_limbs};
+use crate::fp::{Fp, fp_from_limbs_unchecked, fp_modulus_limbs, fp_to_limbs};
 
 pub struct FpMulWitness {
     pub c: [u128; 3],
@@ -63,8 +63,7 @@ pub fn check_fp_mul<let N: u32>(
     let witness = state.fp_mul_witnesses[state.idx];
     let idx = state.idx + 1;
 
-    assert_fp_limbs_in_range(witness.c);
-    let c = fp_from_limbs_checked(witness.c);
+    let c = fp_from_limbs_unchecked(witness.c);
 
     let a_eval = eval_limbs(fp_to_limbs(a), state.rho);
     let b_eval = eval_limbs(fp_to_limbs(b), state.rho);
