@@ -65,8 +65,8 @@ fn field_to_le_bytes32(value: Field) -> [u8; 32] {
         let mut byte: u8 = 0;
         for j in 0..8 {
             let idx = i * 8 + j;
-            let bit: u8 = if idx < 254 { bits[idx] as u8 } else { 0 };
-            byte = byte | (bit << j);
+            let bit: u32 = if idx < 254 { bits[idx] as u32 } else { 0 };
+            byte = byte | ((bit << j) as u8);
         }
         out[i] = byte;
     }

@@ -1,4 +1,5 @@
-use crate::config::{sp1_msm2_w3_table, sp1_vk, sp1_delta_lines, sp1_gamma_lines};
+use crate::config::sp1::{sp1_msm2_w3_table, sp1_vk};
+use crate::config::sp1_lines::{sp1_delta_lines, sp1_gamma_lines};
 use crate::config::sp1::sp1_t_preimage;
 use crate::types::{Proof, VerifyingKey};
 use noir_bn254_pairing::fp::{Fp, fp_one};
