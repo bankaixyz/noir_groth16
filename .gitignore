@@ -3,3 +3,6 @@
 **/out
 .cursor
 .cache
+.pydeps
+.tmp
+.tmp_garaga_ref
