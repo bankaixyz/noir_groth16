@@ -1,4 +1,4 @@
-use crate::fp12::{Fp12, fp12_one, mul_034_by_034};
+use crate::fp12::{Fp12, fp12_one, mul_034_by_034, mul_034_by_034_witnessed, Mul034Witness};
 use crate::fp::{fp_zero};
 use crate::fp2::Fp2;
 use crate::fp6::Fp6;
@@ -200,6 +200,342 @@ pub fn miller_loop<let N: u32>(p_list: [G1Affine; N], q_list: [G2Affine; N]) -> 
     result
 }
 
+/// Miller loop with fixed-G2 line tables and randomized mul_034_by_034 checks.
+pub fn miller_loop_fixed_lines_randomized(
+    p_list: [G1Affine; 3],
+    q_list: [G2Affine; 3],
+    fixed_lines_1: [LineEvaluation; 88],
+    fixed_lines_2: [LineEvaluation; 88],
+    mul_witnesses: [Mul034Witness; 67],
+    rho: Field,
+    alpha: Field,
+) -> Fp12 {
+    assert(rho != 0);
+    assert(alpha != 0);
+
+    let rho_sq = rho * rho;
+    let mut acc: Field = 0;
+    let mut mul_idx: u32 = 0;
+    let mut line1_idx: u32 = 0;
+    let mut line2_idx: u32 = 0;
+
+    let mut result = fp12_one();
+
+    let mut q0_proj = projective_from_affine_g2(q_list[0]);
+    let q0_neg = neg_g2_affine(q_list[0]);
+
+    let (q0, line0) = q0_proj.double_step();
+    q0_proj = q0;
+    let line0 = line_eval_at_point(line0, p_list[0]);
+    result.c0.b0 = line0.r0;
+    result.c1.b0 = line0.r1;
+    result.c1.b1 = line0.r2;
+
+    let line1 = fixed_lines_1[line1_idx];
+    line1_idx = line1_idx + 1;
+    let line1 = line_eval_at_point(line1, p_list[1]);
+    let witness = mul_witnesses[mul_idx];
+    mul_idx = mul_idx + 1;
+    let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+        line1.r0,
+        line1.r1,
+        line1.r2,
+        result.c0.b0,
+        result.c1.b0,
+        result.c1.b1,
+        witness,
+        rho,
+        rho_sq,
+        alpha,
+        acc,
+    );
+    acc = new_acc;
+    result.c0.b0 = prod_lines[0];
+    result.c0.b1 = prod_lines[1];
+    result.c0.b2 = prod_lines[2];
+    result.c1.b0 = prod_lines[3];
+    result.c1.b1 = prod_lines[4];
+
+    let line2 = fixed_lines_2[line2_idx];
+    line2_idx = line2_idx + 1;
+    let line2 = line_eval_at_point(line2, p_list[2]);
+    result = result.mul_by_034(line2.r0, line2.r1, line2.r2);
+
+    result = result.square();
+    {
+        let (q0, l2) = q0_proj.line_compute(q0_neg);
+        q0_proj = q0;
+        let l2 = line_eval_at_point(l2, p_list[0]);
+
+        let (q0, l1) = q0_proj.add_mixed_step(q_list[0]);
+        q0_proj = q0;
+        let l1 = line_eval_at_point(l1, p_list[0]);
+
+        let witness = mul_witnesses[mul_idx];
+        mul_idx = mul_idx + 1;
+        let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+            l1.r0,
+            l1.r1,
+            l1.r2,
+            l2.r0,
+            l2.r1,
+            l2.r2,
+            witness,
+            rho,
+            rho_sq,
+            alpha,
+            acc,
+        );
+        acc = new_acc;
+        result = result.mul_by_01234(prod_lines);
+    }
+
+    {
+        let l2 = fixed_lines_1[line1_idx];
+        line1_idx = line1_idx + 1;
+        let l2 = line_eval_at_point(l2, p_list[1]);
+
+        let l1 = fixed_lines_1[line1_idx];
+        line1_idx = line1_idx + 1;
+        let l1 = line_eval_at_point(l1, p_list[1]);
+
+        let witness = mul_witnesses[mul_idx];
+        mul_idx = mul_idx + 1;
+        let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+            l1.r0,
+            l1.r1,
+            l1.r2,
+            l2.r0,
+            l2.r1,
+            l2.r2,
+            witness,
+            rho,
+            rho_sq,
+            alpha,
+            acc,
+        );
+        acc = new_acc;
+        result = result.mul_by_01234(prod_lines);
+    }
+
+    {
+        let l2 = fixed_lines_2[line2_idx];
+        line2_idx = line2_idx + 1;
+        let l2 = line_eval_at_point(l2, p_list[2]);
+
+        let l1 = fixed_lines_2[line2_idx];
+        line2_idx = line2_idx + 1;
+        let l1 = line_eval_at_point(l1, p_list[2]);
+
+        let witness = mul_witnesses[mul_idx];
+        mul_idx = mul_idx + 1;
+        let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+            l1.r0,
+            l1.r1,
+            l1.r2,
+            l2.r0,
+            l2.r1,
+            l2.r2,
+            witness,
+            rho,
+            rho_sq,
+            alpha,
+            acc,
+        );
+        acc = new_acc;
+        result = result.mul_by_01234(prod_lines);
+    }
+
+    let loop_digits = loop_counter();
+    for idx in 0..63 {
+        let i = 62 - idx;
+        result = result.square();
+
+        let (q0, l1) = q0_proj.double_step();
+        q0_proj = q0;
+        let l1 = line_eval_at_point(l1, p_list[0]);
+
+        if loop_digits[i] == 1i8 {
+            let (q0, l2) = q0_proj.add_mixed_step(q_list[0]);
+            q0_proj = q0;
+            let l2 = line_eval_at_point(l2, p_list[0]);
+            let witness = mul_witnesses[mul_idx];
+            mul_idx = mul_idx + 1;
+            let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+                l1.r0,
+                l1.r1,
+                l1.r2,
+                l2.r0,
+                l2.r1,
+                l2.r2,
+                witness,
+                rho,
+                rho_sq,
+                alpha,
+                acc,
+            );
+            acc = new_acc;
+            result = result.mul_by_01234(prod_lines);
+        } else if loop_digits[i] == -1i8 {
+            let (q0, l2) = q0_proj.add_mixed_step(q0_neg);
+            q0_proj = q0;
+            let l2 = line_eval_at_point(l2, p_list[0]);
+            let witness = mul_witnesses[mul_idx];
+            mul_idx = mul_idx + 1;
+            let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+                l1.r0,
+                l1.r1,
+                l1.r2,
+                l2.r0,
+                l2.r1,
+                l2.r2,
+                witness,
+                rho,
+                rho_sq,
+                alpha,
+                acc,
+            );
+            acc = new_acc;
+            result = result.mul_by_01234(prod_lines);
+        } else {
+            result = result.mul_by_034(l1.r0, l1.r1, l1.r2);
+        }
+
+        let l1 = fixed_lines_1[line1_idx];
+        line1_idx = line1_idx + 1;
+        let l1 = line_eval_at_point(l1, p_list[1]);
+        if loop_digits[i] == 1i8 || loop_digits[i] == -1i8 {
+            let l2 = fixed_lines_1[line1_idx];
+            line1_idx = line1_idx + 1;
+            let l2 = line_eval_at_point(l2, p_list[1]);
+            let witness = mul_witnesses[mul_idx];
+            mul_idx = mul_idx + 1;
+            let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+                l1.r0,
+                l1.r1,
+                l1.r2,
+                l2.r0,
+                l2.r1,
+                l2.r2,
+                witness,
+                rho,
+                rho_sq,
+                alpha,
+                acc,
+            );
+            acc = new_acc;
+            result = result.mul_by_01234(prod_lines);
+        } else {
+            result = result.mul_by_034(l1.r0, l1.r1, l1.r2);
+        }
+
+        let l1 = fixed_lines_2[line2_idx];
+        line2_idx = line2_idx + 1;
+        let l1 = line_eval_at_point(l1, p_list[2]);
+        if loop_digits[i] == 1i8 || loop_digits[i] == -1i8 {
+            let l2 = fixed_lines_2[line2_idx];
+            line2_idx = line2_idx + 1;
+            let l2 = line_eval_at_point(l2, p_list[2]);
+            let witness = mul_witnesses[mul_idx];
+            mul_idx = mul_idx + 1;
+            let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+                l1.r0,
+                l1.r1,
+                l1.r2,
+                l2.r0,
+                l2.r1,
+                l2.r2,
+                witness,
+                rho,
+                rho_sq,
+                alpha,
+                acc,
+            );
+            acc = new_acc;
+            result = result.mul_by_01234(prod_lines);
+        } else {
+            result = result.mul_by_034(l1.r0, l1.r1, l1.r2);
+        }
+    }
+
+    let q1 = frobenius_g2(q_list[0]);
+    let q2 = frobenius_square_g2(q_list[0]);
+    let (q0, l2) = q0_proj.add_mixed_step(q1);
+    q0_proj = q0;
+    let l2 = line_eval_at_point(l2, p_list[0]);
+    let (q0, l1) = q0_proj.line_compute(q2);
+    q0_proj = q0;
+    let l1 = line_eval_at_point(l1, p_list[0]);
+    let witness = mul_witnesses[mul_idx];
+    mul_idx = mul_idx + 1;
+    let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+        l1.r0,
+        l1.r1,
+        l1.r2,
+        l2.r0,
+        l2.r1,
+        l2.r2,
+        witness,
+        rho,
+        rho_sq,
+        alpha,
+        acc,
+    );
+    acc = new_acc;
+    result = result.mul_by_01234(prod_lines);
+
+    let l2 = fixed_lines_1[line1_idx];
+    line1_idx = line1_idx + 1;
+    let l2 = line_eval_at_point(l2, p_list[1]);
+    let l1 = fixed_lines_1[line1_idx];
+    line1_idx = line1_idx + 1;
+    let l1 = line_eval_at_point(l1, p_list[1]);
+    let witness = mul_witnesses[mul_idx];
+    mul_idx = mul_idx + 1;
+    let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+        l1.r0,
+        l1.r1,
+        l1.r2,
+        l2.r0,
+        l2.r1,
+        l2.r2,
+        witness,
+        rho,
+        rho_sq,
+        alpha,
+        acc,
+    );
+    acc = new_acc;
+    result = result.mul_by_01234(prod_lines);
+
+    let l2 = fixed_lines_2[line2_idx];
+    line2_idx = line2_idx + 1;
+    let l2 = line_eval_at_point(l2, p_list[2]);
+    let l1 = fixed_lines_2[line2_idx];
+    line2_idx = line2_idx + 1;
+    let l1 = line_eval_at_point(l1, p_list[2]);
+    let witness = mul_witnesses[mul_idx];
+    mul_idx = mul_idx + 1;
+    let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+        l1.r0,
+        l1.r1,
+        l1.r2,
+        l2.r0,
+        l2.r1,
+        l2.r2,
+        witness,
+        rho,
+        rho_sq,
+        alpha,
+        acc,
+    );
+    acc = new_acc;
+    result = result.mul_by_01234(prod_lines);
+
+    assert(acc == 0);
+    result
+}
+
 /// Miller loop accumulator divided by c^{6x+2}, using the same NAF schedule.
 fn miller_loop_div_c<let N: u32>(
     p_list: [G1Affine; N],
@@ -349,6 +685,361 @@ fn miller_loop_div_c<let N: u32>(
     result
 }
 
+/// Miller loop divider with fixed-G2 line tables and randomized mul_034_by_034 checks.
+fn miller_loop_div_c_fixed_lines_randomized(
+    p_list: [G1Affine; 3],
+    q_list: [G2Affine; 3],
+    fixed_lines_1: [LineEvaluation; 88],
+    fixed_lines_2: [LineEvaluation; 88],
+    mul_witnesses: [Mul034Witness; 67],
+    c: Fp12,
+    c_inv: Fp12,
+    rho: Field,
+    alpha: Field,
+) -> Fp12 {
+    assert(rho != 0);
+    assert(alpha != 0);
+
+    let rho_sq = rho * rho;
+    let mut acc: Field = 0;
+    let mut mul_idx: u32 = 0;
+    let mut line1_idx: u32 = 0;
+    let mut line2_idx: u32 = 0;
+
+    let mut result = fp12_one();
+
+    let mut q0_proj = projective_from_affine_g2(q_list[0]);
+    let q0_neg = neg_g2_affine(q_list[0]);
+
+    let (q0, line0) = q0_proj.double_step();
+    q0_proj = q0;
+    let line0 = line_eval_at_point(line0, p_list[0]);
+    result.c0.b0 = line0.r0;
+    result.c1.b0 = line0.r1;
+    result.c1.b1 = line0.r2;
+
+    let line1 = fixed_lines_1[line1_idx];
+    line1_idx = line1_idx + 1;
+    let line1 = line_eval_at_point(line1, p_list[1]);
+    let witness = mul_witnesses[mul_idx];
+    mul_idx = mul_idx + 1;
+    let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+        line1.r0,
+        line1.r1,
+        line1.r2,
+        result.c0.b0,
+        result.c1.b0,
+        result.c1.b1,
+        witness,
+        rho,
+        rho_sq,
+        alpha,
+        acc,
+    );
+    acc = new_acc;
+    result.c0.b0 = prod_lines[0];
+    result.c0.b1 = prod_lines[1];
+    result.c0.b2 = prod_lines[2];
+    result.c1.b0 = prod_lines[3];
+    result.c1.b1 = prod_lines[4];
+
+    let line2 = fixed_lines_2[line2_idx];
+    line2_idx = line2_idx + 1;
+    let line2 = line_eval_at_point(line2, p_list[2]);
+    result = result.mul_by_034(line2.r0, line2.r1, line2.r2);
+
+    let c_inv_sq = c_inv.square();
+    result = result.mul(c_inv_sq);
+
+    result = result.square();
+    {
+        let (q0, l2) = q0_proj.line_compute(q0_neg);
+        q0_proj = q0;
+        let l2 = line_eval_at_point(l2, p_list[0]);
+
+        let (q0, l1) = q0_proj.add_mixed_step(q_list[0]);
+        q0_proj = q0;
+        let l1 = line_eval_at_point(l1, p_list[0]);
+
+        let witness = mul_witnesses[mul_idx];
+        mul_idx = mul_idx + 1;
+        let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+            l1.r0,
+            l1.r1,
+            l1.r2,
+            l2.r0,
+            l2.r1,
+            l2.r2,
+            witness,
+            rho,
+            rho_sq,
+            alpha,
+            acc,
+        );
+        acc = new_acc;
+        result = result.mul_by_01234(prod_lines);
+    }
+
+    {
+        let l2 = fixed_lines_1[line1_idx];
+        line1_idx = line1_idx + 1;
+        let l2 = line_eval_at_point(l2, p_list[1]);
+
+        let l1 = fixed_lines_1[line1_idx];
+        line1_idx = line1_idx + 1;
+        let l1 = line_eval_at_point(l1, p_list[1]);
+
+        let witness = mul_witnesses[mul_idx];
+        mul_idx = mul_idx + 1;
+        let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+            l1.r0,
+            l1.r1,
+            l1.r2,
+            l2.r0,
+            l2.r1,
+            l2.r2,
+            witness,
+            rho,
+            rho_sq,
+            alpha,
+            acc,
+        );
+        acc = new_acc;
+        result = result.mul_by_01234(prod_lines);
+    }
+
+    {
+        let l2 = fixed_lines_2[line2_idx];
+        line2_idx = line2_idx + 1;
+        let l2 = line_eval_at_point(l2, p_list[2]);
+
+        let l1 = fixed_lines_2[line2_idx];
+        line2_idx = line2_idx + 1;
+        let l1 = line_eval_at_point(l1, p_list[2]);
+
+        let witness = mul_witnesses[mul_idx];
+        mul_idx = mul_idx + 1;
+        let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+            l1.r0,
+            l1.r1,
+            l1.r2,
+            l2.r0,
+            l2.r1,
+            l2.r2,
+            witness,
+            rho,
+            rho_sq,
+            alpha,
+            acc,
+        );
+        acc = new_acc;
+        result = result.mul_by_01234(prod_lines);
+    }
+
+    let loop_digits = loop_counter();
+    let digit = loop_digits[63];
+    if digit == 1i8 {
+        result = result.mul(c_inv);
+    } else if digit == -1i8 {
+        result = result.mul(c);
+    }
+
+    for idx in 0..63 {
+        let i = 62 - idx;
+        result = result.square();
+
+        let (q0, l1) = q0_proj.double_step();
+        q0_proj = q0;
+        let l1 = line_eval_at_point(l1, p_list[0]);
+
+        if loop_digits[i] == 1i8 {
+            let (q0, l2) = q0_proj.add_mixed_step(q_list[0]);
+            q0_proj = q0;
+            let l2 = line_eval_at_point(l2, p_list[0]);
+            let witness = mul_witnesses[mul_idx];
+            mul_idx = mul_idx + 1;
+            let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+                l1.r0,
+                l1.r1,
+                l1.r2,
+                l2.r0,
+                l2.r1,
+                l2.r2,
+                witness,
+                rho,
+                rho_sq,
+                alpha,
+                acc,
+            );
+            acc = new_acc;
+            result = result.mul_by_01234(prod_lines);
+        } else if loop_digits[i] == -1i8 {
+            let (q0, l2) = q0_proj.add_mixed_step(q0_neg);
+            q0_proj = q0;
+            let l2 = line_eval_at_point(l2, p_list[0]);
+            let witness = mul_witnesses[mul_idx];
+            mul_idx = mul_idx + 1;
+            let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+                l1.r0,
+                l1.r1,
+                l1.r2,
+                l2.r0,
+                l2.r1,
+                l2.r2,
+                witness,
+                rho,
+                rho_sq,
+                alpha,
+                acc,
+            );
+            acc = new_acc;
+            result = result.mul_by_01234(prod_lines);
+        } else {
+            result = result.mul_by_034(l1.r0, l1.r1, l1.r2);
+        }
+
+        let l1 = fixed_lines_1[line1_idx];
+        line1_idx = line1_idx + 1;
+        let l1 = line_eval_at_point(l1, p_list[1]);
+        if loop_digits[i] == 1i8 || loop_digits[i] == -1i8 {
+            let l2 = fixed_lines_1[line1_idx];
+            line1_idx = line1_idx + 1;
+            let l2 = line_eval_at_point(l2, p_list[1]);
+            let witness = mul_witnesses[mul_idx];
+            mul_idx = mul_idx + 1;
+            let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+                l1.r0,
+                l1.r1,
+                l1.r2,
+                l2.r0,
+                l2.r1,
+                l2.r2,
+                witness,
+                rho,
+                rho_sq,
+                alpha,
+                acc,
+            );
+            acc = new_acc;
+            result = result.mul_by_01234(prod_lines);
+        } else {
+            result = result.mul_by_034(l1.r0, l1.r1, l1.r2);
+        }
+
+        let l1 = fixed_lines_2[line2_idx];
+        line2_idx = line2_idx + 1;
+        let l1 = line_eval_at_point(l1, p_list[2]);
+        if loop_digits[i] == 1i8 || loop_digits[i] == -1i8 {
+            let l2 = fixed_lines_2[line2_idx];
+            line2_idx = line2_idx + 1;
+            let l2 = line_eval_at_point(l2, p_list[2]);
+            let witness = mul_witnesses[mul_idx];
+            mul_idx = mul_idx + 1;
+            let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+                l1.r0,
+                l1.r1,
+                l1.r2,
+                l2.r0,
+                l2.r1,
+                l2.r2,
+                witness,
+                rho,
+                rho_sq,
+                alpha,
+                acc,
+            );
+            acc = new_acc;
+            result = result.mul_by_01234(prod_lines);
+        } else {
+            result = result.mul_by_034(l1.r0, l1.r1, l1.r2);
+        }
+
+        let digit = loop_digits[i];
+        if digit == 1i8 {
+            result = result.mul(c_inv);
+        } else if digit == -1i8 {
+            result = result.mul(c);
+        }
+    }
+
+    let q1 = frobenius_g2(q_list[0]);
+    let q2 = frobenius_square_g2(q_list[0]);
+    let (q0, l2) = q0_proj.add_mixed_step(q1);
+    q0_proj = q0;
+    let l2 = line_eval_at_point(l2, p_list[0]);
+    let (q0, l1) = q0_proj.line_compute(q2);
+    q0_proj = q0;
+    let l1 = line_eval_at_point(l1, p_list[0]);
+    let witness = mul_witnesses[mul_idx];
+    mul_idx = mul_idx + 1;
+    let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+        l1.r0,
+        l1.r1,
+        l1.r2,
+        l2.r0,
+        l2.r1,
+        l2.r2,
+        witness,
+        rho,
+        rho_sq,
+        alpha,
+        acc,
+    );
+    acc = new_acc;
+    result = result.mul_by_01234(prod_lines);
+
+    let l2 = fixed_lines_1[line1_idx];
+    line1_idx = line1_idx + 1;
+    let l2 = line_eval_at_point(l2, p_list[1]);
+    let l1 = fixed_lines_1[line1_idx];
+    line1_idx = line1_idx + 1;
+    let l1 = line_eval_at_point(l1, p_list[1]);
+    let witness = mul_witnesses[mul_idx];
+    mul_idx = mul_idx + 1;
+    let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+        l1.r0,
+        l1.r1,
+        l1.r2,
+        l2.r0,
+        l2.r1,
+        l2.r2,
+        witness,
+        rho,
+        rho_sq,
+        alpha,
+        acc,
+    );
+    acc = new_acc;
+    result = result.mul_by_01234(prod_lines);
+
+    let l2 = fixed_lines_2[line2_idx];
+    line2_idx = line2_idx + 1;
+    let l2 = line_eval_at_point(l2, p_list[2]);
+    let l1 = fixed_lines_2[line2_idx];
+    line2_idx = line2_idx + 1;
+    let l1 = line_eval_at_point(l1, p_list[2]);
+    let witness = mul_witnesses[mul_idx];
+    mul_idx = mul_idx + 1;
+    let (prod_lines, new_acc) = mul_034_by_034_witnessed(
+        l1.r0,
+        l1.r1,
+        l1.r2,
+        l2.r0,
+        l2.r1,
+        l2.r2,
+        witness,
+        rho,
+        rho_sq,
+        alpha,
+        acc,
+    );
+    acc = new_acc;
+    result = result.mul_by_01234(prod_lines);
+
+    assert(acc == 0);
+    result
+}
+
 /// Final exponentiation easy part: z^{p^6-1} * z^{p^2+1}.
 pub fn final_exp_easy_part(z: Fp12) -> Fp12 {
     let t0 = z.conjugate();
@@ -438,6 +1129,42 @@ pub fn pairing_check_with_preimage<let N: u32>(
 ) -> bool {
     let c_inv = c.inverse();
     let f_div_c = miller_loop_div_c(p_list, q_list, c, c_inv);
+    let f_t = f_div_c.mul(t_preimage);
+
+    let w_in_fp6 = fp6_is_zero(w.c1);
+    let mut acc = f_t.mul(w);
+    acc = acc.mul(c_inv.frobenius());
+    acc = acc.mul(c.frobenius_square());
+    acc = acc.mul(c_inv.frobenius_cube());
+
+    w_in_fp6 & acc.is_one()
+}
+
+/// PairingCheck with fixed-G2 line tables and randomized mul_034_by_034 checks.
+pub fn pairing_check_with_preimage_fixed_lines_randomized(
+    p_list: [G1Affine; 3],
+    q_list: [G2Affine; 3],
+    fixed_lines_1: [LineEvaluation; 88],
+    fixed_lines_2: [LineEvaluation; 88],
+    mul_witnesses: [Mul034Witness; 67],
+    t_preimage: Fp12,
+    c: Fp12,
+    w: Fp12,
+    rho: Field,
+    alpha: Field,
+) -> bool {
+    let c_inv = c.inverse();
+    let f_div_c = miller_loop_div_c_fixed_lines_randomized(
+        p_list,
+        q_list,
+        fixed_lines_1,
+        fixed_lines_2,
+        mul_witnesses,
+        c,
+        c_inv,
+        rho,
+        alpha,
+    );
     let f_t = f_div_c.mul(t_preimage);
 
     let w_in_fp6 = fp6_is_zero(w.c1);

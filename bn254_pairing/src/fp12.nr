@@ -1,3 +1,4 @@
+use crate::fp::{Fp};
 use crate::fp2::{Fp2, fp2_one, fp2_zero};
 use crate::fp6::{Fp6, fp6_one, fp6_zero};
 
@@ -253,4 +254,93 @@ pub fn mul_034_by_034(d0: Fp2, d3: Fp2, d4: Fp2, c0: Fp2, c3: Fp2, c4: Fp2) -> [
 
     let z00 = x4.mul_by_non_residue().add(x0);
     [z00, x3, x34, x03, x04]
+}
+
+/// Witnessed outputs for a mul_034_by_034 multiplication.
+pub struct Mul034Witness {
+    pub x0: Fp2,
+    pub x3: Fp2,
+    pub x4: Fp2,
+    pub x04: Fp2,
+    pub x03: Fp2,
+    pub x34: Fp2,
+}
+
+fn fp_eval_at_rho(limbs: [Field; 3], rho: Field, rho_sq: Field) -> Field {
+    limbs[0] + limbs[1] * rho + limbs[2] * rho_sq
+}
+
+fn fp_eval(a: Fp, rho: Field, rho_sq: Field) -> Field {
+    let limbs = a.to_limbs();
+    fp_eval_at_rho(limbs, rho, rho_sq)
+}
+
+fn fp2_eval(a: Fp2, rho: Field, rho_sq: Field) -> [Field; 2] {
+    [fp_eval(a.c0, rho, rho_sq), fp_eval(a.c1, rho, rho_sq)]
+}
+
+fn update_fp2_mul_check(
+    mut acc: Field,
+    alpha: Field,
+    a_eval: [Field; 2],
+    b_eval: [Field; 2],
+    out_eval: [Field; 2],
+) -> Field {
+    let t0 = a_eval[0] * b_eval[0];
+    let t1 = a_eval[1] * b_eval[1];
+    let expected0 = t0 - t1;
+    let expected1 = (a_eval[0] + a_eval[1]) * (b_eval[0] + b_eval[1]) - t0 - t1;
+
+    acc = acc * alpha + (out_eval[0] - expected0);
+    acc = acc * alpha + (out_eval[1] - expected1);
+    acc
+}
+
+/// Multiply two sparse line evaluations with witnessed outputs and randomized checks.
+pub fn mul_034_by_034_witnessed(
+    d0: Fp2,
+    d3: Fp2,
+    d4: Fp2,
+    c0: Fp2,
+    c3: Fp2,
+    c4: Fp2,
+    witness: Mul034Witness,
+    rho: Field,
+    rho_sq: Field,
+    alpha: Field,
+    acc: Field,
+) -> ([Fp2; 5], Field) {
+    let c0_eval = fp2_eval(c0, rho, rho_sq);
+    let c3_eval = fp2_eval(c3, rho, rho_sq);
+    let c4_eval = fp2_eval(c4, rho, rho_sq);
+    let d0_eval = fp2_eval(d0, rho, rho_sq);
+    let d3_eval = fp2_eval(d3, rho, rho_sq);
+    let d4_eval = fp2_eval(d4, rho, rho_sq);
+
+    let x0_eval = fp2_eval(witness.x0, rho, rho_sq);
+    let x3_eval = fp2_eval(witness.x3, rho, rho_sq);
+    let x4_eval = fp2_eval(witness.x4, rho, rho_sq);
+    let x04_eval = fp2_eval(witness.x04, rho, rho_sq);
+    let x03_eval = fp2_eval(witness.x03, rho, rho_sq);
+    let x34_eval = fp2_eval(witness.x34, rho, rho_sq);
+
+    let mut acc = acc;
+    acc = update_fp2_mul_check(acc, alpha, c0_eval, d0_eval, x0_eval);
+    acc = update_fp2_mul_check(acc, alpha, c3_eval, d3_eval, x3_eval);
+    acc = update_fp2_mul_check(acc, alpha, c4_eval, d4_eval, x4_eval);
+
+    let c04_eval = [c0_eval[0] + c4_eval[0], c0_eval[1] + c4_eval[1]];
+    let d04_eval = [d0_eval[0] + d4_eval[0], d0_eval[1] + d4_eval[1]];
+    acc = update_fp2_mul_check(acc, alpha, c04_eval, d04_eval, x04_eval);
+
+    let c03_eval = [c0_eval[0] + c3_eval[0], c0_eval[1] + c3_eval[1]];
+    let d03_eval = [d0_eval[0] + d3_eval[0], d0_eval[1] + d3_eval[1]];
+    acc = update_fp2_mul_check(acc, alpha, c03_eval, d03_eval, x03_eval);
+
+    let c34_eval = [c3_eval[0] + c4_eval[0], c3_eval[1] + c4_eval[1]];
+    let d34_eval = [d3_eval[0] + d4_eval[0], d3_eval[1] + d4_eval[1]];
+    acc = update_fp2_mul_check(acc, alpha, c34_eval, d34_eval, x34_eval);
+
+    let z00 = witness.x4.mul_by_non_residue().add(witness.x0);
+    ([z00, witness.x3, witness.x34, witness.x03, witness.x04], acc)
 }

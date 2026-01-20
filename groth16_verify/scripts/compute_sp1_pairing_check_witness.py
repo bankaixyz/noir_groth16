@@ -476,7 +476,19 @@ class Fp12:
         return Fp12(Fp6(t0, t1, t2), Fp6(t3, t4, t5))
 
 
-def mul_034_by_034(d0: Fp2, d3: Fp2, d4: Fp2, c0: Fp2, c3: Fp2, c4: Fp2) -> List[Fp2]:
+@dataclass(frozen=True)
+class Mul034Witness:
+    x0: Fp2
+    x3: Fp2
+    x4: Fp2
+    x04: Fp2
+    x03: Fp2
+    x34: Fp2
+
+
+def mul_034_by_034_with_witness(
+    d0: Fp2, d3: Fp2, d4: Fp2, c0: Fp2, c3: Fp2, c4: Fp2
+) -> Tuple[List[Fp2], Mul034Witness]:
     x0 = c0.mul(d0)
     x3 = c3.mul(d3)
     x4 = c4.mul(d4)
@@ -486,7 +498,13 @@ def mul_034_by_034(d0: Fp2, d3: Fp2, d4: Fp2, c0: Fp2, c3: Fp2, c4: Fp2) -> List
     x34 = c3.add(c4).mul(d3.add(d4)).sub(x3).sub(x4)
 
     z00 = x4.mul_by_non_residue().add(x0)
-    return [z00, x3, x34, x03, x04]
+    witness = Mul034Witness(x0=x0, x3=x3, x4=x4, x04=x04, x03=x03, x34=x34)
+    return [z00, x3, x34, x03, x04], witness
+
+
+def mul_034_by_034(d0: Fp2, d3: Fp2, d4: Fp2, c0: Fp2, c3: Fp2, c4: Fp2) -> List[Fp2]:
+    result, _ = mul_034_by_034_with_witness(d0, d3, d4, c0, c3, c4)
+    return result
 
 
 @dataclass(frozen=True)
@@ -714,7 +732,64 @@ def loop_counter() -> List[int]:
     return naf
 
 
-def miller_loop(p_list: List[G1Affine], q_list: List[G2Affine]) -> Fp12:
+def compute_fixed_lines(q: G2Affine) -> List[LineEvaluation]:
+    q_proj = projective_from_affine_g2(q)
+    q_neg = q.neg()
+    lines: List[LineEvaluation] = []
+
+    q_proj, line = q_proj.double_step()
+    lines.append(line)
+
+    q_proj, l2 = q_proj.line_compute(q_neg)
+    lines.append(l2)
+    q_proj, l1 = q_proj.add_mixed_step(q)
+    lines.append(l1)
+
+    digits = loop_counter()
+    for idx in range(63):
+        i = 62 - idx
+        q_proj, l1 = q_proj.double_step()
+        lines.append(l1)
+        if digits[i] == 1:
+            q_proj, l2 = q_proj.add_mixed_step(q)
+            lines.append(l2)
+        elif digits[i] == -1:
+            q_proj, l2 = q_proj.add_mixed_step(q_neg)
+            lines.append(l2)
+
+    q1 = frobenius_g2(q)
+    q2 = frobenius_square_g2(q)
+    q_proj, l2 = q_proj.add_mixed_step(q1)
+    lines.append(l2)
+    q_proj, l1 = q_proj.line_compute(q2)
+    lines.append(l1)
+
+    if len(lines) != 88:
+        raise RuntimeError(f"unexpected line count: {len(lines)}")
+    return lines
+
+
+def mul_034_by_034_record(
+    d0: Fp2,
+    d3: Fp2,
+    d4: Fp2,
+    c0: Fp2,
+    c3: Fp2,
+    c4: Fp2,
+    witnesses: List[Mul034Witness] | None,
+) -> List[Fp2]:
+    if witnesses is None:
+        return mul_034_by_034(d0, d3, d4, c0, c3, c4)
+    result, witness = mul_034_by_034_with_witness(d0, d3, d4, c0, c3, c4)
+    witnesses.append(witness)
+    return result
+
+
+def miller_loop(
+    p_list: List[G1Affine],
+    q_list: List[G2Affine],
+    mul_witnesses: List[Mul034Witness] | None = None,
+) -> Fp12:
     pairs = [(p, q) for p, q in zip(p_list, q_list) if not p.is_infinity() and not q.is_infinity()]
     n = len(pairs)
     if n == 0:
@@ -740,13 +815,14 @@ def miller_loop(p_list: List[G1Affine], q_list: List[G2Affine]) -> Fp12:
         q1, line = q_proj[1].double_step()
         q_proj[1] = q1
         line = line_eval_at_point(line, p[1])
-        prod_lines = mul_034_by_034(
+        prod_lines = mul_034_by_034_record(
             line.r0,
             line.r1,
             line.r2,
             result.c0.b0,
             result.c1.b0,
             result.c1.b1,
+            mul_witnesses,
         )
         result = Fp12(Fp6(prod_lines[0], prod_lines[1], prod_lines[2]), Fp6(prod_lines[3], prod_lines[4], fp2_zero()))
 
@@ -766,7 +842,7 @@ def miller_loop(p_list: List[G1Affine], q_list: List[G2Affine]) -> Fp12:
         q_proj[k] = qk
         l1 = line_eval_at_point(l1, p[k])
 
-        prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2)
+        prod_lines = mul_034_by_034_record(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2, mul_witnesses)
         result = result.mul_by_01234(prod_lines)
 
     digits = loop_counter()
@@ -782,13 +858,29 @@ def miller_loop(p_list: List[G1Affine], q_list: List[G2Affine]) -> Fp12:
                 qk, l2 = q_proj[k].add_mixed_step(q[k])
                 q_proj[k] = qk
                 l2 = line_eval_at_point(l2, p[k])
-                prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2)
+                prod_lines = mul_034_by_034_record(
+                    l1.r0,
+                    l1.r1,
+                    l1.r2,
+                    l2.r0,
+                    l2.r1,
+                    l2.r2,
+                    mul_witnesses,
+                )
                 result = result.mul_by_01234(prod_lines)
             elif digits[i] == -1:
                 qk, l2 = q_proj[k].add_mixed_step(q_neg[k])
                 q_proj[k] = qk
                 l2 = line_eval_at_point(l2, p[k])
-                prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2)
+                prod_lines = mul_034_by_034_record(
+                    l1.r0,
+                    l1.r1,
+                    l1.r2,
+                    l2.r0,
+                    l2.r1,
+                    l2.r2,
+                    mul_witnesses,
+                )
                 result = result.mul_by_01234(prod_lines)
             else:
                 result = result.mul_by_034(l1.r0, l1.r1, l1.r2)
@@ -805,7 +897,7 @@ def miller_loop(p_list: List[G1Affine], q_list: List[G2Affine]) -> Fp12:
         q_proj[k] = qk
         l1 = line_eval_at_point(l1, p[k])
 
-        prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2)
+        prod_lines = mul_034_by_034_record(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2, mul_witnesses)
         result = result.mul_by_01234(prod_lines)
 
     return result
@@ -1074,9 +1166,16 @@ def compute_linear_combination(input0: int, input1: int) -> G1Affine:
     return jacobian_to_affine_g1(acc)
 
 
-def compute_witness(a: G1Affine, b: G2Affine, c: G1Affine, input0: int, input1: int) -> Tuple[Fp12, Fp12]:
+def compute_witness(
+    a: G1Affine,
+    b: G2Affine,
+    c: G1Affine,
+    input0: int,
+    input1: int,
+    mul_witnesses: List[Mul034Witness] | None = None,
+) -> Tuple[Fp12, Fp12]:
     l = compute_linear_combination(input0, input1)
-    f = miller_loop([a, c, l], [b, SP1_DELTA_NEG, SP1_GAMMA_NEG])
+    f = miller_loop([a, c, l], [b, SP1_DELTA_NEG, SP1_GAMMA_NEG], mul_witnesses)
     f_t = f.mul(sp1_t_preimage())
 
     rng = random.Random(0)
@@ -1114,6 +1213,19 @@ def fp12_to_limb_list(z: Fp12) -> List[List[str]]:
     return [limbs_as_strings(fp_to_limbs(coeff)) for coeff in fp12_to_coeffs(z)]
 
 
+def fp2_to_limb_list(z: Fp2) -> List[List[str]]:
+    l0, l1, l2 = fp_to_limbs(z.c0)
+    r0, r1, r2 = fp_to_limbs(z.c1)
+    return [limbs_as_strings([l0, l1, l2]), limbs_as_strings([r0, r1, r2])]
+
+
+def mul_witness_to_limb_list(wit: Mul034Witness) -> List[List[str]]:
+    out: List[List[str]] = []
+    for fp2 in [wit.x0, wit.x3, wit.x4, wit.x04, wit.x03, wit.x34]:
+        out.extend(fp2_to_limb_list(fp2))
+    return out
+
+
 def emit_fp12_noir(z: Fp12) -> str:
     coeffs = fp12_to_coeffs(z)
     fp2s = [
@@ -1137,12 +1249,37 @@ def emit_fp12_noir(z: Fp12) -> str:
     return "\n".join(lines)
 
 
+def emit_fp2_noir(z: Fp2) -> str:
+    l0, l1, l2 = fp_to_limbs(z.c0)
+    r0, r1, r2 = fp_to_limbs(z.c1)
+    return (
+        f"fp2_from_limbs([{hex(l0)}, {hex(l1)}, {hex(l2)}], "
+        f"[{hex(r0)}, {hex(r1)}, {hex(r2)}])"
+    )
+
+
+def emit_line_evals_noir(name: str, lines: List[LineEvaluation]) -> str:
+    entries = []
+    for line in lines:
+        entries.append(
+            "        LineEvaluation {\n"
+            f"            r0: {emit_fp2_noir(line.r0)},\n"
+            f"            r1: {emit_fp2_noir(line.r1)},\n"
+            f"            r2: {emit_fp2_noir(line.r2)},\n"
+            "        },"
+        )
+    body = "\n".join(entries)
+    return f"pub fn {name}() -> [LineEvaluation; {len(lines)}] {{\n    [\n{body}\n    ]\n}}"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="SP1 PairingCheck witness generator")
     parser.add_argument("--proof-json", help="SP1 proof JSON (proof/publicValues/vkey)")
     parser.add_argument("--format", choices=["json", "toml"], default="json")
     parser.add_argument("--no-validate", action="store_true")
     parser.add_argument("--print-t-preimage", action="store_true")
+    parser.add_argument("--print-fixed-lines", action="store_true")
+    parser.add_argument("--include-mul-witnesses", action="store_true")
     parser.add_argument("--output", help="Write output to file")
     args = parser.parse_args()
 
@@ -1153,6 +1290,10 @@ def main() -> None:
         outputs.append(emit_fp12_noir(sp1_t_preimage()))
         outputs.append("}")
 
+    if args.print_fixed_lines:
+        outputs.append(emit_line_evals_noir("sp1_gamma_lines", compute_fixed_lines(SP1_GAMMA_NEG)))
+        outputs.append(emit_line_evals_noir("sp1_delta_lines", compute_fixed_lines(SP1_DELTA_NEG)))
+
     if args.proof_json:
         with open(args.proof_json, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -1160,7 +1301,10 @@ def main() -> None:
         public_values = bytes.fromhex(data["publicValues"][2:] if data["publicValues"].startswith("0x") else data["publicValues"])
         vkey = int.from_bytes(bytes.fromhex(data["vkey"][2:] if data["vkey"].startswith("0x") else data["vkey"]), "big")
         input0, input1 = compute_sp1_public_inputs(vkey, public_values)
-        c_wit, w_wit = compute_witness(a, b, c, input0, input1)
+        mul_witnesses: List[Mul034Witness] | None = [] if args.include_mul_witnesses else None
+        c_wit, w_wit = compute_witness(a, b, c, input0, input1, mul_witnesses)
+        if mul_witnesses is not None and len(mul_witnesses) != 67:
+            raise SystemExit(f"unexpected mul witness count: {len(mul_witnesses)}")
 
         if not args.no_validate:
             f = miller_loop([a, c, compute_linear_combination(input0, input1)], [b, SP1_DELTA_NEG, SP1_GAMMA_NEG])
@@ -1176,6 +1320,8 @@ def main() -> None:
             "c": fp12_to_limb_list(c_wit),
             "w": fp12_to_limb_list(w_wit),
         }
+        if mul_witnesses is not None:
+            payload["mul_witnesses"] = [mul_witness_to_limb_list(wit) for wit in mul_witnesses]
 
         if args.format == "json":
             outputs.append(json.dumps(payload, indent=2))
@@ -1188,6 +1334,14 @@ def main() -> None:
             for row in payload["w"]:
                 lines.append(f'  ["{row[0]}", "{row[1]}", "{row[2]}"],')
             lines.append("]")
+            if "mul_witnesses" in payload:
+                lines.append("mul_witnesses = [")
+                for entry in payload["mul_witnesses"]:
+                    lines.append("  [")
+                    for row in entry:
+                        lines.append(f'    ["{row[0]}", "{row[1]}", "{row[2]}"],')
+                    lines.append("  ],")
+                lines.append("]")
             outputs.append("\n".join(lines))
 
     if not outputs:

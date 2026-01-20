@@ -1,8 +1,14 @@
-use crate::config::sp1::{sp1_msm2_w3_table, sp1_vk, sp1_t_preimage};
+use crate::config::sp1::{
+    sp1_delta_lines,
+    sp1_gamma_lines,
+    sp1_msm2_w3_table,
+    sp1_t_preimage,
+    sp1_vk,
+};
 use crate::types::{Proof, VerifyingKey};
 use noir_bn254_pairing::fp::{fp_one};
 use noir_bn254_pairing::fp2::Fp2;
-use noir_bn254_pairing::fp12::Fp12;
+use noir_bn254_pairing::fp12::{Fp12, Mul034Witness};
 use noir_bn254_pairing::g1::{
     G1Affine,
     G1Jac,
@@ -14,8 +20,12 @@ use noir_bn254_pairing::g1::{
     is_on_curve_g1_affine,
     jacobian_to_affine_g1,
 };
-use noir_bn254_pairing::g2::{is_in_correct_subgroup_g2, is_on_curve_g2_affine};
-use noir_bn254_pairing::pairing::{pairing_check_with_preimage, pairing_multi};
+use noir_bn254_pairing::g2::{is_in_correct_subgroup_g2, is_on_curve_g2_affine, LineEvaluation};
+use noir_bn254_pairing::pairing::{
+    pairing_check_with_preimage,
+    pairing_check_with_preimage_fixed_lines_randomized,
+    pairing_multi,
+};
 
 /// Convert G1 affine to Jacobian without inversion.
 fn g1_affine_to_jac(p: G1Affine) -> G1Jac {
@@ -247,5 +257,74 @@ pub fn verify_sp1_pairing_check_with_table(
         t_preimage,
         c,
         w,
+    )
+}
+
+/// PairingCheck fast path with fixed line tables and randomized checks.
+pub fn verify_sp1_pairing_check_fixed_lines_randomized(
+    proof: Proof,
+    public_inputs: [Field; 2],
+    c: Fp12,
+    w: Fp12,
+    rho: Field,
+    alpha: Field,
+    mul_witnesses: [Mul034Witness; 67],
+) -> bool {
+    let vk = sp1_vk();
+    let msm2_w3_table = sp1_msm2_w3_table();
+    let delta_lines = sp1_delta_lines();
+    let gamma_lines = sp1_gamma_lines();
+    verify_sp1_pairing_check_fixed_lines_randomized_with_table(
+        vk,
+        proof,
+        public_inputs,
+        msm2_w3_table,
+        delta_lines,
+        gamma_lines,
+        c,
+        w,
+        rho,
+        alpha,
+        mul_witnesses,
+    )
+}
+
+/// PairingCheck fast path with caller-supplied tables and fixed lines.
+pub fn verify_sp1_pairing_check_fixed_lines_randomized_with_table(
+    vk: VerifyingKey<3>,
+    proof: Proof,
+    public_inputs: [Field; 2],
+    msm2_w3_table: [G1Affine; 64],
+    delta_lines: [LineEvaluation; 88],
+    gamma_lines: [LineEvaluation; 88],
+    c: Fp12,
+    w: Fp12,
+    rho: Field,
+    alpha: Field,
+    mul_witnesses: [Mul034Witness; 67],
+) -> bool {
+    assert(is_on_curve_g1_affine(proof.a));
+    assert(is_on_curve_g1_affine(proof.c));
+    assert(is_on_curve_g2_affine(proof.b));
+    assert(!proof.a.is_infinity());
+    assert(!proof.b.is_infinity());
+    assert(!proof.c.is_infinity());
+    assert(is_in_correct_subgroup_g2(proof.b));
+    let msm = msm2_window3_g1_jac(msm2_w3_table, public_inputs[0], public_inputs[1]);
+    let acc = add_g1_jac_mixed(msm, vk.ic[0]);
+    let l = jacobian_to_affine_g1(acc);
+    let t_preimage = sp1_t_preimage();
+
+    pairing_check_with_preimage_fixed_lines_randomized(
+        [proof.a, proof.c, l],
+        [proof.b, vk.delta_neg, vk.gamma_neg],
+        delta_lines,
+        gamma_lines,
+        mul_witnesses,
+        t_preimage,
+        c,
+        w,
+        rho,
+        alpha,
     )
 }
