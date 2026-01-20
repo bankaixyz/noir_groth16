@@ -1,4 +1,5 @@
-use crate::config::sp1::{sp1_msm2_w3_table, sp1_vk, sp1_t_preimage};
+use crate::config::sp1::{sp1_msm2_w3_table, sp1_vk, sp1_t_preimage, sp1_vk_hash};
+use crate::poseidon_challenge::derive_rho_alpha;
 use crate::types::{Proof, VerifyingKey};
 use noir_bn254_pairing::fp::{fp_one};
 use noir_bn254_pairing::fp2::Fp2;
@@ -15,7 +16,12 @@ use noir_bn254_pairing::g1::{
     jacobian_to_affine_g1,
 };
 use noir_bn254_pairing::g2::{is_in_correct_subgroup_g2, is_on_curve_g2_affine};
-use noir_bn254_pairing::pairing::{pairing_check_with_preimage, pairing_multi};
+use noir_bn254_pairing::pairing::{
+    PairingMulTrace,
+    pairing_check_with_preimage,
+    pairing_check_with_preimage_randomized,
+    pairing_multi,
+};
 
 /// Convert G1 affine to Jacobian without inversion.
 fn g1_affine_to_jac(p: G1Affine) -> G1Jac {
@@ -247,5 +253,56 @@ pub fn verify_sp1_pairing_check_with_table(
         t_preimage,
         c,
         w,
+    )
+}
+
+/// PairingCheck randomized path for SP1 proofs with multiplication trace.
+pub fn verify_sp1_pairing_check_randomized(
+    proof: Proof,
+    public_inputs: [Field; 2],
+    c: Fp12,
+    w: Fp12,
+    seed: Field,
+    trace: PairingMulTrace<3>,
+) -> bool {
+    let vk = sp1_vk();
+    let msm2_w3_table = sp1_msm2_w3_table();
+    verify_sp1_pairing_check_randomized_with_table(vk, proof, public_inputs, msm2_w3_table, c, w, seed, trace)
+}
+
+/// Randomized PairingCheck with caller-supplied table and VK (SP1 only).
+pub fn verify_sp1_pairing_check_randomized_with_table(
+    vk: VerifyingKey<3>,
+    proof: Proof,
+    public_inputs: [Field; 2],
+    msm2_w3_table: [G1Affine; 64],
+    c: Fp12,
+    w: Fp12,
+    seed: Field,
+    trace: PairingMulTrace<3>,
+) -> bool {
+    assert(is_on_curve_g1_affine(proof.a));
+    assert(is_on_curve_g1_affine(proof.c));
+    assert(is_on_curve_g2_affine(proof.b));
+    assert(!proof.a.is_infinity());
+    assert(!proof.b.is_infinity());
+    assert(!proof.c.is_infinity());
+    assert(is_in_correct_subgroup_g2(proof.b));
+    let msm = msm2_window3_g1_jac(msm2_w3_table, public_inputs[0], public_inputs[1]);
+    let acc = add_g1_jac_mixed(msm, vk.ic[0]);
+    let l = jacobian_to_affine_g1(acc);
+    let t_preimage = sp1_t_preimage();
+    let vk_hash = sp1_vk_hash();
+    let (rho, alpha) = derive_rho_alpha(seed, public_inputs, vk_hash);
+
+    pairing_check_with_preimage_randomized(
+        [proof.a, proof.c, l],
+        [proof.b, vk.delta_neg, vk.gamma_neg],
+        t_preimage,
+        c,
+        w,
+        rho,
+        alpha,
+        trace,
     )
 }

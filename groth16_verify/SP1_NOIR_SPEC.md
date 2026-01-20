@@ -150,3 +150,37 @@ Important details:
   - Hardcode the points above as constants, and
   - Precompute any pairing line coefficients for `alpha`, `beta`, `gamma`, `delta`, and the fixed `IC` points (if your pairing library supports fixed-base precomputation).
 - If you can precompute Miller loop line coefficients for the fixed G2 points, do so outside the circuit and hardcode them.
+
+## 4) Randomized PairingCheck path (Poseidon challenges)
+
+The randomized Fp12 checks use a public seed and in-circuit Poseidon to derive challenges:
+
+```
+rho   = Poseidon(domain=1, seed, public_inputs[0], public_inputs[1], vk_hash)
+alpha = Poseidon(domain=2, seed, public_inputs[0], public_inputs[1], vk_hash, rho)
+```
+
+For SP1, `vk_hash` is hardcoded as:
+
+```
+sp1_vk_hash = 6446815737053153707797248679798859719027829623554482675155244433404538974249
+```
+
+This value is computed as SHA256 over the 12 Fp limbs of `alpha_beta` in the standard
+Fp12 coefficient order (c0.b0.c0, c0.b0.c1, ..., c1.b2.c1), concatenating each 120-bit
+limb as 16 big-endian bytes, then masking to 253 bits.
+
+### Additional inputs (randomized path)
+
+The randomized entrypoint adds:
+
+- `seed: Field` (public input)
+- `trace: PairingMulTrace<3>` (witness), containing:
+  - `mul_by_034: [Fp12; 132]`
+  - `mul_by_01234: [Fp12; 66]`
+  - `squares: [Fp12; 65]`
+  - `muls: [Fp12; 27]`
+  - `fp_mul_witnesses: [FpMulWitness; 12702]`
+
+`FpMulWitness` stores limbs for the base-field product `c` and quotient `q`, each as
+three 120-bit limbs. The witness generator pads unused entries with zero values.

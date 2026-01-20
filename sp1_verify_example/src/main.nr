@@ -4,7 +4,12 @@ use noir_bn254_pairing::fp6::Fp6;
 use noir_bn254_pairing::fp12::Fp12;
 use noir_bn254_pairing::g1::G1Affine;
 use noir_bn254_pairing::g2::G2Affine;
-use noir_groth16_verify::sp1::{sp1_public_inputs, verify_sp1_pairing_check};
+use noir_bn254_pairing::pairing::PairingMulTrace;
+use noir_groth16_verify::sp1::{
+    sp1_public_inputs,
+    verify_sp1_pairing_check,
+    verify_sp1_pairing_check_randomized,
+};
 use noir_groth16_verify::types::Proof;
 
 pub fn main(
@@ -33,6 +38,46 @@ pub fn main(
     let c_fp12 = fp12_from_coeffs(c);
     let w_fp12 = fp12_from_coeffs(w);
     let verified = verify_sp1_pairing_check(vkey, public_values, proof, c_fp12, w_fp12);
+    assert(verified);
+    sp1_public_inputs(vkey, public_values)
+}
+
+pub fn main_randomized(
+    a_x: [u128; 3],
+    a_y: [u128; 3],
+    b_x_c0: [u128; 3],
+    b_x_c1: [u128; 3],
+    b_y_c0: [u128; 3],
+    b_y_c1: [u128; 3],
+    c_x: [u128; 3],
+    c_y: [u128; 3],
+    vkey: Field,
+    public_values: [u8; 32],
+    c: [[u128; 3]; 12],
+    w: [[u128; 3]; 12],
+    seed: Field,
+    trace: PairingMulTrace<3>,
+) -> pub [Field; 2] {
+    let proof = Proof {
+        a: G1Affine { x: fp_from_limbs_checked(a_x), y: fp_from_limbs_checked(a_y) },
+        b: G2Affine {
+            x: Fp2 { c0: fp_from_limbs_checked(b_x_c0), c1: fp_from_limbs_checked(b_x_c1) },
+            y: Fp2 { c0: fp_from_limbs_checked(b_y_c0), c1: fp_from_limbs_checked(b_y_c1) },
+        },
+        c: G1Affine { x: fp_from_limbs_checked(c_x), y: fp_from_limbs_checked(c_y) },
+    };
+
+    let c_fp12 = fp12_from_coeffs(c);
+    let w_fp12 = fp12_from_coeffs(w);
+    let verified = verify_sp1_pairing_check_randomized(
+        vkey,
+        public_values,
+        proof,
+        c_fp12,
+        w_fp12,
+        seed,
+        trace,
+    );
     assert(verified);
     sp1_public_inputs(vkey, public_values)
 }

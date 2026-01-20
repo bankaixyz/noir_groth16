@@ -1,10 +1,15 @@
 use crate::types::Proof;
-use crate::verify::{verify_sp1_fast, verify_sp1_pairing_check as verify_sp1_pairing_check_impl};
+use crate::verify::{
+    verify_sp1_fast,
+    verify_sp1_pairing_check as verify_sp1_pairing_check_impl,
+    verify_sp1_pairing_check_randomized as verify_sp1_pairing_check_randomized_impl,
+};
 use noir_bn254_pairing::fp::Fp;
 use noir_bn254_pairing::fp2::Fp2;
 use noir_bn254_pairing::fp12::Fp12;
 use noir_bn254_pairing::g1::G1Affine;
 use noir_bn254_pairing::g2::G2Affine;
+use noir_bn254_pairing::pairing::PairingMulTrace;
 use noir_bn254_pairing::BigNum;
 use sha256::sha256_var;
 
@@ -68,6 +73,20 @@ pub fn verify_sp1_pairing_check<let N: u32>(
 ) -> bool {
     let public_inputs = sp1_public_inputs(vkey, public_values);
     verify_sp1_pairing_check_impl(proof, public_inputs, c, w)
+}
+
+/// Verifies an SP1 Groth16 proof using randomized Fp12 checks.
+pub fn verify_sp1_pairing_check_randomized<let N: u32>(
+    vkey: Field,
+    public_values: [u8; N],
+    proof: Proof,
+    c: Fp12,
+    w: Fp12,
+    seed: Field,
+    trace: PairingMulTrace<3>,
+) -> bool {
+    let public_inputs = sp1_public_inputs(vkey, public_values);
+    verify_sp1_pairing_check_randomized_impl(proof, public_inputs, c, w, seed, trace)
 }
 
 /// Build an Fp element from 3 u128 limbs (BN254 limb order).

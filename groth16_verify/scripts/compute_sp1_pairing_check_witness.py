@@ -32,6 +32,10 @@ def fp_to_limbs(x: int) -> Tuple[int, int, int]:
     return (x & LIMB_MASK, (x >> LIMB_BITS) & LIMB_MASK, x >> (2 * LIMB_BITS))
 
 
+def int_to_limbs(x: int) -> Tuple[int, int, int]:
+    return (x & LIMB_MASK, (x >> LIMB_BITS) & LIMB_MASK, x >> (2 * LIMB_BITS))
+
+
 def fp_add(a: int, b: int) -> int:
     return (a + b) % P
 
@@ -46,6 +50,33 @@ def fp_mul(a: int, b: int) -> int:
 
 def fp_inv(a: int) -> int:
     return pow(a, P - 2, P)
+
+
+@dataclass(frozen=True)
+class FpMulWitness:
+    c: int
+    q: int
+
+
+@dataclass
+class PairingMulTraceBuilder:
+    fp12_mul: List["Fp12"]
+    fp12_square: List["Fp12"]
+    fp12_mul_by_034: List["Fp12"]
+    fp12_mul_by_01234: List["Fp12"]
+    fp_mul: List[FpMulWitness]
+
+
+def new_trace_builder() -> PairingMulTraceBuilder:
+    return PairingMulTraceBuilder([], [], [], [], [])
+
+
+def fp_mul_trace(a: int, b: int, trace: PairingMulTraceBuilder) -> int:
+    prod = a * b
+    c = prod % P
+    q = (prod - c) // P
+    trace.fp_mul.append(FpMulWitness(c, q))
+    return c
 
 
 @dataclass(frozen=True)
@@ -476,6 +507,131 @@ class Fp12:
         return Fp12(Fp6(t0, t1, t2), Fp6(t3, t4, t5))
 
 
+def fp2_mul_trace(a: Fp2, b: Fp2, trace: PairingMulTraceBuilder) -> Fp2:
+    a0 = fp_add(a.c0, a.c1)
+    b0 = fp_add(b.c0, b.c1)
+    t0 = fp_mul_trace(a0, b0, trace)
+    t1 = fp_mul_trace(a.c0, b.c0, trace)
+    t2 = fp_mul_trace(a.c1, b.c1, trace)
+    return Fp2(fp_sub(t1, t2), fp_sub(fp_sub(t0, t1), t2))
+
+
+def fp2_square_trace(a: Fp2, trace: PairingMulTraceBuilder) -> Fp2:
+    a0 = fp_add(a.c0, a.c1)
+    b0 = fp_sub(a.c0, a.c1)
+    t0 = fp_mul_trace(a0, b0, trace)
+    t1 = fp_mul_trace(a.c0, a.c1, trace)
+    t1 = fp_add(t1, t1)
+    return Fp2(t0, t1)
+
+
+def fp6_mul_trace(a: Fp6, b: Fp6, trace: PairingMulTraceBuilder) -> Fp6:
+    t0 = fp2_mul_trace(a.b0, b.b0, trace)
+    t1 = fp2_mul_trace(a.b1, b.b1, trace)
+    t2 = fp2_mul_trace(a.b2, b.b2, trace)
+
+    c0 = fp2_mul_trace(a.b1.add(a.b2), b.b1.add(b.b2), trace)
+    c0 = c0.sub(t1).sub(t2)
+    c0 = c0.mul_by_non_residue().add(t0)
+
+    c1 = fp2_mul_trace(a.b0.add(a.b1), b.b0.add(b.b1), trace)
+    c1 = c1.sub(t0).sub(t1)
+    c1 = c1.add(t2.mul_by_non_residue())
+
+    c2 = fp2_mul_trace(a.b0.add(a.b2), b.b0.add(b.b2), trace)
+    c2 = c2.sub(t0).sub(t2).add(t1)
+
+    return Fp6(c0, c1, c2)
+
+
+def fp6_square_trace(a: Fp6, trace: PairingMulTraceBuilder) -> Fp6:
+    c4 = fp2_mul_trace(a.b0, a.b1, trace).double()
+    c5 = fp2_square_trace(a.b2, trace)
+    c1 = c5.mul_by_non_residue().add(c4)
+    c2 = c4.sub(c5)
+    c3 = fp2_square_trace(a.b0, trace)
+    c4 = a.b0.sub(a.b1).add(a.b2)
+    c5 = fp2_mul_trace(a.b1, a.b2, trace).double()
+    c4 = fp2_square_trace(c4, trace)
+    c0 = c5.mul_by_non_residue().add(c3)
+
+    b2 = c2.add(c4).add(c5).sub(c3)
+    return Fp6(c0, c1, b2)
+
+
+def fp6_mul_by_e2_trace(a: Fp6, c0: Fp2, trace: PairingMulTraceBuilder) -> Fp6:
+    return Fp6(
+        fp2_mul_trace(a.b0, c0, trace),
+        fp2_mul_trace(a.b1, c0, trace),
+        fp2_mul_trace(a.b2, c0, trace),
+    )
+
+
+def fp6_mul_by_01_trace(a: Fp6, c0: Fp2, c1: Fp2, trace: PairingMulTraceBuilder) -> Fp6:
+    t0 = fp2_mul_trace(a.b0, c0, trace)
+    t1 = fp2_mul_trace(a.b1, c1, trace)
+
+    z0 = fp2_mul_trace(c1, a.b1.add(a.b2), trace)
+    z0 = z0.sub(t1).mul_by_non_residue().add(t0)
+
+    z2 = fp2_mul_trace(c0, a.b0.add(a.b2), trace)
+    z2 = z2.sub(t0).add(t1)
+
+    z1 = fp2_mul_trace(c0.add(c1), a.b0.add(a.b1), trace)
+    z1 = z1.sub(t0).sub(t1)
+
+    return Fp6(z0, z1, z2)
+
+
+def fp12_mul_trace(a: Fp12, b: Fp12, trace: PairingMulTraceBuilder) -> Fp12:
+    t0 = fp6_mul_trace(a.c0.add(a.c1), b.c0.add(b.c1), trace)
+    t1 = fp6_mul_trace(a.c0, b.c0, trace)
+    t2 = fp6_mul_trace(a.c1, b.c1, trace)
+    c1 = t0.sub(t1).sub(t2)
+    c0 = t2.mul_by_non_residue().add(t1)
+    out = Fp12(c0, c1)
+    trace.fp12_mul.append(out)
+    return out
+
+
+def fp12_square_trace(a: Fp12, trace: PairingMulTraceBuilder) -> Fp12:
+    ab = fp6_mul_trace(a.c0, a.c1, trace)
+    a_sq = fp6_square_trace(a.c0, trace)
+    b_sq = fp6_square_trace(a.c1, trace)
+    c0 = a_sq.add(b_sq.mul_by_non_residue())
+    c1 = ab.double()
+    out = Fp12(c0, c1)
+    trace.fp12_square.append(out)
+    return out
+
+
+def fp12_mul_by_034_trace(a: Fp12, c0: Fp2, c3: Fp2, c4: Fp2, trace: PairingMulTraceBuilder) -> Fp12:
+    t0 = fp6_mul_by_e2_trace(a.c0, c0, trace)
+    t1 = fp6_mul_by_01_trace(a.c1, c3, c4, trace)
+    d0 = c0.add(c3)
+    t2 = fp6_mul_by_01_trace(a.c0.add(a.c1), d0, c4, trace)
+    c1 = t2.sub(t0).sub(t1)
+    c0 = t1.mul_by_non_residue().add(t0)
+    out = Fp12(c0, c1)
+    trace.fp12_mul_by_034.append(out)
+    return out
+
+
+def fp12_mul_by_01234_trace(a: Fp12, x: List[Fp2], trace: PairingMulTraceBuilder) -> Fp12:
+    c0 = Fp6(x[0], x[1], x[2])
+    c1 = Fp6(x[3], x[4], fp2_zero())
+
+    t0 = fp6_mul_trace(a.c0.add(a.c1), c0.add(c1), trace)
+    t1 = fp6_mul_trace(a.c0, c0, trace)
+    t2 = fp6_mul_by_01_trace(a.c1, x[3], x[4], trace)
+
+    c1 = t0.sub(t1).sub(t2)
+    c0 = t2.mul_by_non_residue().add(t1)
+    out = Fp12(c0, c1)
+    trace.fp12_mul_by_01234.append(out)
+    return out
+
+
 def mul_034_by_034(d0: Fp2, d3: Fp2, d4: Fp2, c0: Fp2, c3: Fp2, c4: Fp2) -> List[Fp2]:
     x0 = c0.mul(d0)
     x3 = c3.mul(d3)
@@ -811,6 +967,124 @@ def miller_loop(p_list: List[G1Affine], q_list: List[G2Affine]) -> Fp12:
     return result
 
 
+def miller_loop_div_c_trace(
+    p_list: List[G1Affine],
+    q_list: List[G2Affine],
+    c: Fp12,
+    c_inv: Fp12,
+    trace: PairingMulTraceBuilder,
+) -> Fp12:
+    pairs = [(p, q) for p, q in zip(p_list, q_list) if not p.is_infinity() and not q.is_infinity()]
+    n = len(pairs)
+    if n == 0:
+        return Fp12.one()
+
+    p = [pair[0] for pair in pairs]
+    q = [pair[1] for pair in pairs]
+    q_proj = [projective_from_affine_g2(qi) for qi in q]
+    q_neg = [qi.neg() for qi in q]
+
+    result = Fp12.one()
+
+    if n >= 1:
+        q0, line = q_proj[0].double_step()
+        q_proj[0] = q0
+        line = line_eval_at_point(line, p[0])
+        result = Fp12(
+            Fp6(line.r0, fp2_zero(), fp2_zero()),
+            Fp6(line.r1, line.r2, fp2_zero()),
+        )
+
+    if n >= 2:
+        q1, line = q_proj[1].double_step()
+        q_proj[1] = q1
+        line = line_eval_at_point(line, p[1])
+        prod_lines = mul_034_by_034(
+            line.r0,
+            line.r1,
+            line.r2,
+            result.c0.b0,
+            result.c1.b0,
+            result.c1.b1,
+        )
+        result = Fp12(Fp6(prod_lines[0], prod_lines[1], prod_lines[2]), Fp6(prod_lines[3], prod_lines[4], fp2_zero()))
+
+    for k in range(2, n):
+        qk, line = q_proj[k].double_step()
+        q_proj[k] = qk
+        line = line_eval_at_point(line, p[k])
+        result = fp12_mul_by_034_trace(result, line.r0, line.r1, line.r2, trace)
+
+    c_inv_sq = fp12_square_trace(c_inv, trace)
+    result = fp12_mul_trace(result, c_inv_sq, trace)
+
+    result = fp12_square_trace(result, trace)
+    for k in range(n):
+        qk, l2 = q_proj[k].line_compute(q_neg[k])
+        q_proj[k] = qk
+        l2 = line_eval_at_point(l2, p[k])
+
+        qk, l1 = q_proj[k].add_mixed_step(q[k])
+        q_proj[k] = qk
+        l1 = line_eval_at_point(l1, p[k])
+
+        prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2)
+        result = fp12_mul_by_01234_trace(result, prod_lines, trace)
+
+    digits = loop_counter()
+    digit = digits[63]
+    if digit == 1:
+        result = fp12_mul_trace(result, c_inv, trace)
+    elif digit == -1:
+        result = fp12_mul_trace(result, c, trace)
+
+    for idx in range(63):
+        i = 62 - idx
+        result = fp12_square_trace(result, trace)
+        for k in range(n):
+            qk, l1 = q_proj[k].double_step()
+            q_proj[k] = qk
+            l1 = line_eval_at_point(l1, p[k])
+
+            if digits[i] == 1:
+                qk, l2 = q_proj[k].add_mixed_step(q[k])
+                q_proj[k] = qk
+                l2 = line_eval_at_point(l2, p[k])
+                prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2)
+                result = fp12_mul_by_01234_trace(result, prod_lines, trace)
+            elif digits[i] == -1:
+                qk, l2 = q_proj[k].add_mixed_step(q_neg[k])
+                q_proj[k] = qk
+                l2 = line_eval_at_point(l2, p[k])
+                prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2)
+                result = fp12_mul_by_01234_trace(result, prod_lines, trace)
+            else:
+                result = fp12_mul_by_034_trace(result, l1.r0, l1.r1, l1.r2, trace)
+
+        digit = digits[i]
+        if digit == 1:
+            result = fp12_mul_trace(result, c_inv, trace)
+        elif digit == -1:
+            result = fp12_mul_trace(result, c, trace)
+
+    for k in range(n):
+        q1 = frobenius_g2(q[k])
+        q2 = frobenius_square_g2(q[k])
+
+        qk, l2 = q_proj[k].add_mixed_step(q1)
+        q_proj[k] = qk
+        l2 = line_eval_at_point(l2, p[k])
+
+        qk, l1 = q_proj[k].line_compute(q2)
+        q_proj[k] = qk
+        l1 = line_eval_at_point(l1, p[k])
+
+        prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2)
+        result = fp12_mul_by_01234_trace(result, prod_lines, trace)
+
+    return result
+
+
 def final_exponentiation(z: Fp12) -> Fp12:
     result = final_exp_easy_part(z)
     if result.is_one():
@@ -1106,12 +1380,60 @@ def compute_witness(a: G1Affine, b: G2Affine, c: G1Affine, input0: int, input1: 
     return c_wit, w
 
 
+def compute_randomized_trace(
+    a: G1Affine,
+    b: G2Affine,
+    c: G1Affine,
+    input0: int,
+    input1: int,
+    c_wit: Fp12,
+    w_wit: Fp12,
+) -> PairingMulTraceBuilder:
+    l = compute_linear_combination(input0, input1)
+    trace = new_trace_builder()
+    c_inv = c_wit.inverse()
+    f_div_c = miller_loop_div_c_trace([a, c, l], [b, SP1_DELTA_NEG, SP1_GAMMA_NEG], c_wit, c_inv, trace)
+    f_t = fp12_mul_trace(f_div_c, sp1_t_preimage(), trace)
+    acc = fp12_mul_trace(f_t, w_wit, trace)
+    acc = fp12_mul_trace(acc, c_inv.frobenius(), trace)
+    acc = fp12_mul_trace(acc, c_wit.frobenius_square(), trace)
+    fp12_mul_trace(acc, c_inv.frobenius_cube(), trace)
+    return trace
+
+
+def pad_trace(trace: PairingMulTraceBuilder, pair_count: int) -> None:
+    target_mul_by_034 = pair_count * 44
+    target_mul_by_01234 = pair_count * 22
+    target_squares = 65
+    target_muls = 27
+    target_fp_mul = pair_count * 2838 + 4188
+
+    def pad_list(values: List, target: int, filler) -> None:
+        if len(values) > target:
+            raise RuntimeError(f"trace overflow: {len(values)} > {target}")
+        while len(values) < target:
+            values.append(filler)
+
+    pad_list(trace.fp12_mul_by_034, target_mul_by_034, Fp12.zero())
+    pad_list(trace.fp12_mul_by_01234, target_mul_by_01234, Fp12.zero())
+    pad_list(trace.fp12_square, target_squares, Fp12.zero())
+    pad_list(trace.fp12_mul, target_muls, Fp12.zero())
+    pad_list(trace.fp_mul, target_fp_mul, FpMulWitness(0, 0))
+
+
 def limbs_as_strings(values: Iterable[int]) -> List[str]:
     return [str(v) for v in values]
 
 
 def fp12_to_limb_list(z: Fp12) -> List[List[str]]:
     return [limbs_as_strings(fp_to_limbs(coeff)) for coeff in fp12_to_coeffs(z)]
+
+
+def fp_mul_witness_to_limbs(witness: FpMulWitness) -> dict:
+    return {
+        "c": limbs_as_strings(fp_to_limbs(witness.c)),
+        "q": limbs_as_strings(int_to_limbs(witness.q)),
+    }
 
 
 def emit_fp12_noir(z: Fp12) -> str:
@@ -1143,6 +1465,8 @@ def main() -> None:
     parser.add_argument("--format", choices=["json", "toml"], default="json")
     parser.add_argument("--no-validate", action="store_true")
     parser.add_argument("--print-t-preimage", action="store_true")
+    parser.add_argument("--randomized", action="store_true")
+    parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--output", help="Write output to file")
     args = parser.parse_args()
 
@@ -1177,9 +1501,23 @@ def main() -> None:
             "w": fp12_to_limb_list(w_wit),
         }
 
+        if args.randomized:
+            trace = compute_randomized_trace(a, b, c, input0, input1, c_wit, w_wit)
+            pad_trace(trace, 3)
+            payload["seed"] = str(args.seed)
+            payload["trace"] = {
+                "mul_by_034": [fp12_to_limb_list(z) for z in trace.fp12_mul_by_034],
+                "mul_by_01234": [fp12_to_limb_list(z) for z in trace.fp12_mul_by_01234],
+                "squares": [fp12_to_limb_list(z) for z in trace.fp12_square],
+                "muls": [fp12_to_limb_list(z) for z in trace.fp12_mul],
+                "fp_mul_witnesses": [fp_mul_witness_to_limbs(w) for w in trace.fp_mul],
+            }
+
         if args.format == "json":
             outputs.append(json.dumps(payload, indent=2))
         else:
+            if args.randomized:
+                raise SystemExit("randomized output requires json format")
             lines = ["c = ["]
             for row in payload["c"]:
                 lines.append(f'  ["{row[0]}", "{row[1]}", "{row[2]}"],')

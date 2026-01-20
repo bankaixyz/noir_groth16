@@ -77,6 +77,11 @@ fn alpha_beta() -> Fp12 {
     fp12_from(fp6_from(c0_b0, c0_b1, c0_b2), fp6_from(c1_b0, c1_b1, c1_b2))
 }
 
+/// Poseidon input hash for SP1 verifying key (alpha_beta limbs).
+pub fn sp1_vk_hash() -> Field {
+    6446815737053153707797248679798859719027829623554482675155244433404538974249
+}
+
 /// SP1 pairing-check preimage: FE(t_preimage) = alpha_beta^{-1}.
 pub fn sp1_t_preimage() -> Fp12 {
     let c0_b0 = fp2_from_limbs(
