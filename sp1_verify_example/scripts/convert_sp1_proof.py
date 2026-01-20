@@ -36,6 +36,13 @@ def load_pairing_check_witness(input_path: str) -> dict:
     return json.loads(output.decode("utf-8"))
 
 
+def toml_inline_table(data: dict) -> str:
+    parts = []
+    for key, value in data.items():
+        parts.append(f"{key} = {json.dumps(value)}")
+    return "{ " + ", ".join(parts) + " }"
+
+
 def main():
     parser = argparse.ArgumentParser(description="Convert SP1 proof JSON to Noir inputs")
     parser.add_argument("input_json", help="SP1 proof JSON (proof/publicValues/vkey)")
@@ -113,6 +120,17 @@ def main():
         for row in witness["w"]:
             print(f'  ["{row[0]}", "{row[1]}", "{row[2]}"],')
         print("]")
+
+        if "lines" in witness:
+            print("")
+            print("# Line schedule (evaluated at P)")
+            print(f"lines = {toml_inline_table(witness['lines'])}")
+            print("")
+            print("# Raw line coefficients for B")
+            print(f"b_lines_raw = {toml_inline_table(witness['b_lines_raw'])}")
+            print("")
+            print("# Line witness intermediates for B")
+            print(f"b_line_witness = {toml_inline_table(witness['b_line_witness'])}")
 
 
 if __name__ == "__main__":

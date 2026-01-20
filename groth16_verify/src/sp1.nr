@@ -1,10 +1,14 @@
 use crate::types::Proof;
-use crate::verify::{verify_sp1_fast, verify_sp1_pairing_check as verify_sp1_pairing_check_impl};
-use noir_bn254_pairing::fp::Fp;
+use crate::verify::{
+    verify_sp1_fast,
+    verify_sp1_pairing_check as verify_sp1_pairing_check_impl,
+    verify_sp1_pairing_check_with_lines as verify_sp1_pairing_check_with_lines_impl,
+};
+use noir_bn254_pairing::fp::{Fp, fp_from_limbs_checked};
 use noir_bn254_pairing::fp2::Fp2;
 use noir_bn254_pairing::fp12::Fp12;
 use noir_bn254_pairing::g1::G1Affine;
-use noir_bn254_pairing::g2::G2Affine;
+use noir_bn254_pairing::g2::{G2Affine, G2LineWitnessSp1, LineScheduleSp1, LineScheduleSp1Raw};
 use noir_bn254_pairing::BigNum;
 use sha256::sha256_var;
 
@@ -13,6 +17,19 @@ fn bytes32_to_field(bytes: [u8; 32]) -> Field {
     let mut result: Field = 0;
     for i in 0..32 {
         result = result * 256 + bytes[i] as Field;
+    }
+    result
+}
+
+fn fp_from_u128(value: u128) -> Fp {
+    Fp::from_limbs([value, 0, 0])
+}
+
+fn bytes32_to_fp(bytes: [u8; 32]) -> Fp {
+    let mut result = fp_from_u128(0);
+    let base = fp_from_u128(256);
+    for i in 0..32 {
+        result = result * base + fp_from_u128(bytes[i] as u128);
     }
     result
 }
@@ -29,6 +46,75 @@ pub fn hash_to_field(hash: [u8; 32]) -> Field {
 fn hash_public_values<let N: u32>(public_values: [u8; N]) -> Field {
     let hash: [u8; 32] = sha256_var(public_values, N);
     hash_to_field(hash)
+}
+
+fn u128_to_le_bytes(value: u128) -> [u8; 16] {
+    let mut out = [0u8; 16];
+    let mut v = value;
+    for i in 0..16 {
+        out[i] = (v & 0xff) as u8;
+        v = v >> 8;
+    }
+    out
+}
+
+fn field_to_le_bytes32(value: Field) -> [u8; 32] {
+    let bits: [u1; 254] = value.to_le_bits();
+    let mut out = [0u8; 32];
+    for i in 0..32 {
+        let mut byte: u8 = 0;
+        for j in 0..8 {
+            let idx = i * 8 + j;
+            let bit: u8 = if idx < 254 { bits[idx] as u8 } else { 0 };
+            byte = byte | (bit << j);
+        }
+        out[i] = byte;
+    }
+    out
+}
+
+fn derive_rho_sp1<let N: u32>(
+    vkey: Field,
+    public_values: [u8; N],
+    a_x: [u128; 3],
+    a_y: [u128; 3],
+    b_x_c0: [u128; 3],
+    b_x_c1: [u128; 3],
+    b_y_c0: [u128; 3],
+    b_y_c1: [u128; 3],
+    c_x: [u128; 3],
+    c_y: [u128; 3],
+) -> Fp {
+    let public_inputs = sp1_public_inputs(vkey, public_values);
+    let input0_bytes = field_to_le_bytes32(public_inputs[0]);
+    let input1_bytes = field_to_le_bytes32(public_inputs[1]);
+
+    let mut data = [0u8; 448];
+    let mut offset: u32 = 0;
+
+    for i in 0..32 {
+        data[offset + i] = input0_bytes[i];
+    }
+    offset = offset + 32;
+    for i in 0..32 {
+        data[offset + i] = input1_bytes[i];
+    }
+    offset = offset + 32;
+
+    let limb_sets = [a_x, a_y, b_x_c0, b_x_c1, b_y_c0, b_y_c1, c_x, c_y];
+    for s in 0..8 {
+        let limbs = limb_sets[s];
+        for l in 0..3 {
+            let limb_bytes = u128_to_le_bytes(limbs[l]);
+            for i in 0..16 {
+                data[offset + i] = limb_bytes[i];
+            }
+            offset = offset + 16;
+        }
+    }
+
+    let hash: [u8; 32] = sha256_var(data, 448);
+    bytes32_to_fp(hash)
 }
 
 /// SP1 public inputs: [vkey, H(public_values)] where H is SHA256.
@@ -68,6 +154,57 @@ pub fn verify_sp1_pairing_check<let N: u32>(
 ) -> bool {
     let public_inputs = sp1_public_inputs(vkey, public_values);
     verify_sp1_pairing_check_impl(proof, public_inputs, c, w)
+}
+
+/// Verifies an SP1 Groth16 proof using PairingCheck with witnessed line schedule.
+pub fn verify_sp1_pairing_check_with_lines<let N: u32>(
+    vkey: Field,
+    public_values: [u8; N],
+    a_x: [u128; 3],
+    a_y: [u128; 3],
+    b_x_c0: [u128; 3],
+    b_x_c1: [u128; 3],
+    b_y_c0: [u128; 3],
+    b_y_c1: [u128; 3],
+    c_x: [u128; 3],
+    c_y: [u128; 3],
+    c: Fp12,
+    w: Fp12,
+    lines: LineScheduleSp1,
+    b_lines_raw: LineScheduleSp1Raw,
+    b_line_witness: G2LineWitnessSp1,
+) -> bool {
+    let proof = Proof {
+        a: G1Affine { x: fp_from_limbs_checked(a_x), y: fp_from_limbs_checked(a_y) },
+        b: G2Affine {
+            x: Fp2 { c0: fp_from_limbs_checked(b_x_c0), c1: fp_from_limbs_checked(b_x_c1) },
+            y: Fp2 { c0: fp_from_limbs_checked(b_y_c0), c1: fp_from_limbs_checked(b_y_c1) },
+        },
+        c: G1Affine { x: fp_from_limbs_checked(c_x), y: fp_from_limbs_checked(c_y) },
+    };
+    let public_inputs = sp1_public_inputs(vkey, public_values);
+    let rho = derive_rho_sp1(
+        vkey,
+        public_values,
+        a_x,
+        a_y,
+        b_x_c0,
+        b_x_c1,
+        b_y_c0,
+        b_y_c1,
+        c_x,
+        c_y,
+    );
+    verify_sp1_pairing_check_with_lines_impl(
+        proof,
+        public_inputs,
+        c,
+        w,
+        lines,
+        b_lines_raw,
+        b_line_witness,
+        rho,
+    )
 }
 
 /// Build an Fp element from 3 u128 limbs (BN254 limb order).

@@ -1,6 +1,7 @@
-use crate::config::sp1::{sp1_msm2_w3_table, sp1_vk, sp1_t_preimage};
+use crate::config::{sp1_msm2_w3_table, sp1_vk, sp1_delta_lines, sp1_gamma_lines};
+use crate::config::sp1::sp1_t_preimage;
 use crate::types::{Proof, VerifyingKey};
-use noir_bn254_pairing::fp::{fp_one};
+use noir_bn254_pairing::fp::{Fp, fp_one};
 use noir_bn254_pairing::fp2::Fp2;
 use noir_bn254_pairing::fp12::Fp12;
 use noir_bn254_pairing::g1::{
@@ -14,8 +15,21 @@ use noir_bn254_pairing::g1::{
     is_on_curve_g1_affine,
     jacobian_to_affine_g1,
 };
-use noir_bn254_pairing::g2::{is_in_correct_subgroup_g2, is_on_curve_g2_affine};
-use noir_bn254_pairing::pairing::{pairing_check_with_preimage, pairing_multi};
+use noir_bn254_pairing::g2::{
+    G2LineWitnessSp1,
+    LineEvalAtP,
+    LineEvaluation,
+    LineScheduleSp1,
+    LineScheduleSp1Raw,
+    is_in_correct_subgroup_g2,
+    is_on_curve_g2_affine,
+};
+use noir_bn254_pairing::pairing::{
+    check_b_line_witness_sp1,
+    pairing_check_with_preimage,
+    pairing_check_with_preimage_and_lines_sp1,
+    pairing_multi,
+};
 
 /// Convert G1 affine to Jacobian without inversion.
 fn g1_affine_to_jac(p: G1Affine) -> G1Jac {
@@ -127,6 +141,58 @@ fn fp12_eq(a: Fp12, b: Fp12) -> bool {
     let c4 = fp2_eq(a.c1.b1, b.c1.b1);
     let c5 = fp2_eq(a.c1.b2, b.c1.b2);
     c0 & c1 & c2 & c3 & c4 & c5
+}
+
+fn eval_line_at_p(line: LineEvaluation, p: G1Affine) -> LineEvalAtP {
+    LineEvalAtP {
+        r0: line.r0.mul_by_element(p.y),
+        r1: line.r1.mul_by_element(p.x),
+        r2: line.r2,
+    }
+}
+
+fn line_eval_matches_p(line: LineEvaluation, eval: LineEvalAtP, p: G1Affine) -> bool {
+    let expected = eval_line_at_p(line, p);
+    fp2_eq(expected.r0, eval.r0) & fp2_eq(expected.r1, eval.r1) & fp2_eq(expected.r2, eval.r2)
+}
+
+fn sp1_loop_digits() -> [i8; 66] {
+    [
+        0, 0, 0, 1, 0, 1, 0, -1, 0, 0, -1, 0, 0, 0, 1, 0,
+        0, -1, 0, -1, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0, -1, 0,
+        0, 1, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, -1, 0, 0, -1,
+        0, 1, 0, -1, 0, 0, 0, -1, 0, -1, 0, 0, 0, 1, 0, -1,
+        0, 1,
+    ]
+}
+
+fn check_fixed_line_schedule_sp1(
+    p: G1Affine,
+    raw: LineScheduleSp1Raw,
+    lines: LineScheduleSp1,
+    pair_idx: u32,
+) -> bool {
+    let mut ok = true;
+
+    ok = ok & line_eval_matches_p(raw.initial_double, lines.initial_doubles[pair_idx], p);
+    ok = ok & line_eval_matches_p(raw.pre_loop_line, lines.pre_loop_lines[pair_idx], p);
+    ok = ok & line_eval_matches_p(raw.pre_loop_add, lines.pre_loop_adds[pair_idx], p);
+
+    let digits = sp1_loop_digits();
+    for idx in 0..63 {
+        let digit = digits[62 - idx];
+        ok = ok & line_eval_matches_p(raw.loop_doubles[idx], lines.loop_doubles[idx][pair_idx], p);
+        if digit == 1i8 {
+            ok = ok & line_eval_matches_p(raw.loop_adds_pos[idx], lines.loop_adds_pos[idx][pair_idx], p);
+        } else if digit == -1i8 {
+            ok = ok & line_eval_matches_p(raw.loop_adds_neg[idx], lines.loop_adds_neg[idx][pair_idx], p);
+        }
+    }
+
+    ok = ok & line_eval_matches_p(raw.final_add, lines.final_adds[pair_idx], p);
+    ok = ok & line_eval_matches_p(raw.final_line, lines.final_lines[pair_idx], p);
+
+    ok
 }
 
 /// Double-and-add scalar multiplication in G1.
@@ -248,4 +314,76 @@ pub fn verify_sp1_pairing_check_with_table(
         c,
         w,
     )
+}
+
+/// PairingCheck fast path with line schedule witness inputs for SP1 proofs.
+pub fn verify_sp1_pairing_check_with_lines(
+    proof: Proof,
+    public_inputs: [Field; 2],
+    c: Fp12,
+    w: Fp12,
+    lines: LineScheduleSp1,
+    b_lines_raw: LineScheduleSp1Raw,
+    b_line_witness: G2LineWitnessSp1,
+    rho: Fp,
+) -> bool {
+    let vk = sp1_vk();
+    let msm2_w3_table = sp1_msm2_w3_table();
+    verify_sp1_pairing_check_with_lines_and_table(
+        vk,
+        proof,
+        public_inputs,
+        msm2_w3_table,
+        c,
+        w,
+        lines,
+        b_lines_raw,
+        b_line_witness,
+        rho,
+    )
+}
+
+/// PairingCheck fast path with caller-supplied VK, line schedule, and rho.
+pub fn verify_sp1_pairing_check_with_lines_and_table(
+    vk: VerifyingKey<3>,
+    proof: Proof,
+    public_inputs: [Field; 2],
+    msm2_w3_table: [G1Affine; 64],
+    c: Fp12,
+    w: Fp12,
+    lines: LineScheduleSp1,
+    b_lines_raw: LineScheduleSp1Raw,
+    b_line_witness: G2LineWitnessSp1,
+    rho: Fp,
+) -> bool {
+    assert(is_on_curve_g1_affine(proof.a));
+    assert(is_on_curve_g1_affine(proof.c));
+    assert(is_on_curve_g2_affine(proof.b));
+    assert(!proof.a.is_infinity());
+    assert(!proof.b.is_infinity());
+    assert(!proof.c.is_infinity());
+    assert(is_in_correct_subgroup_g2(proof.b));
+    let msm = msm2_window3_g1_jac(msm2_w3_table, public_inputs[0], public_inputs[1]);
+    let acc = add_g1_jac_mixed(msm, vk.ic[0]);
+    let l = jacobian_to_affine_g1(acc);
+    let t_preimage = sp1_t_preimage();
+
+    let b_lines_ok = check_b_line_witness_sp1(proof.a, proof.b, b_lines_raw, lines, b_line_witness, rho);
+
+    let delta_lines = sp1_delta_lines();
+    let gamma_lines = sp1_gamma_lines();
+    let delta_ok = check_fixed_line_schedule_sp1(proof.c, delta_lines, lines, 1);
+    let gamma_ok = check_fixed_line_schedule_sp1(l, gamma_lines, lines, 2);
+    let fixed_ok = delta_ok & gamma_ok;
+
+    let pairing_ok = pairing_check_with_preimage_and_lines_sp1(
+        [proof.a, proof.c, l],
+        [proof.b, vk.delta_neg, vk.gamma_neg],
+        t_preimage,
+        c,
+        w,
+        lines,
+    );
+
+    b_lines_ok & fixed_ok & pairing_ok
 }

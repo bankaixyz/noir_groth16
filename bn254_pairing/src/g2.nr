@@ -28,6 +28,73 @@ pub struct LineEvaluation {
     pub r2: Fp2,
 }
 
+/// Line evaluation already specialized at a G1 point (r0*Y + r1*X + r2).
+pub struct LineEvalAtP {
+    pub r0: Fp2,
+    pub r1: Fp2,
+    pub r2: Fp2,
+}
+
+/// Line schedule for SP1's fixed 3-pair Miller loop (evaluated at P).
+pub struct LineScheduleSp1 {
+    pub initial_doubles: [LineEvalAtP; 3],
+    pub pre_loop_lines: [LineEvalAtP; 3],
+    pub pre_loop_adds: [LineEvalAtP; 3],
+    pub loop_doubles: [[LineEvalAtP; 3]; 63],
+    pub loop_adds_pos: [[LineEvalAtP; 3]; 63],
+    pub loop_adds_neg: [[LineEvalAtP; 3]; 63],
+    pub final_adds: [LineEvalAtP; 3],
+    pub final_lines: [LineEvalAtP; 3],
+}
+
+/// Raw line schedule for a single G2 point (un-evaluated coefficients).
+pub struct LineScheduleSp1Raw {
+    pub initial_double: LineEvaluation,
+    pub pre_loop_line: LineEvaluation,
+    pub pre_loop_add: LineEvaluation,
+    pub loop_doubles: [LineEvaluation; 63],
+    pub loop_adds_pos: [LineEvaluation; 63],
+    pub loop_adds_neg: [LineEvaluation; 63],
+    pub final_add: LineEvaluation,
+    pub final_line: LineEvaluation,
+}
+
+pub struct G2DoubleStepWitness {
+    pub a: Fp2,
+    pub b: Fp2,
+    pub c: Fp2,
+    pub ee: Fp2,
+}
+
+pub struct G2AddStepWitness {
+    pub c: Fp2,
+    pub d: Fp2,
+    pub e: Fp2,
+    pub f: Fp2,
+    pub g: Fp2,
+    pub t1: Fp2,
+    pub t2: Fp2,
+}
+
+pub struct G2LineComputeWitness {
+    pub t2: Fp2,
+}
+
+/// Projective-state and intermediate witnesses for SP1 line checks on B.
+pub struct G2LineWitnessSp1 {
+    pub double_witnesses: [G2DoubleStepWitness; 64],
+    pub double_outputs: [G2Proj; 64],
+    pub pre_loop_line_witness: G2LineComputeWitness,
+    pub pre_loop_add_witness: G2AddStepWitness,
+    pub pre_loop_add_output: G2Proj,
+    pub loop_add_witness_pos: [G2AddStepWitness; 63],
+    pub loop_add_witness_neg: [G2AddStepWitness; 63],
+    pub loop_add_outputs: [G2Proj; 63],
+    pub final_add_witness: G2AddStepWitness,
+    pub final_add_output: G2Proj,
+    pub final_line_witness: G2LineComputeWitness,
+}
+
 /// Affine point at infinity (0, 0).
 pub fn g2_affine_infinity() -> G2Affine {
     G2Affine { x: fp2_zero(), y: fp2_zero() }

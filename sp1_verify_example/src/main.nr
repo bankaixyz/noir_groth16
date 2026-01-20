@@ -2,10 +2,8 @@ use noir_bn254_pairing::fp::fp_from_limbs_checked;
 use noir_bn254_pairing::fp2::Fp2;
 use noir_bn254_pairing::fp6::Fp6;
 use noir_bn254_pairing::fp12::Fp12;
-use noir_bn254_pairing::g1::G1Affine;
-use noir_bn254_pairing::g2::G2Affine;
-use noir_groth16_verify::sp1::{sp1_public_inputs, verify_sp1_pairing_check};
-use noir_groth16_verify::types::Proof;
+use noir_bn254_pairing::g2::{G2LineWitnessSp1, LineScheduleSp1, LineScheduleSp1Raw};
+use noir_groth16_verify::sp1::{sp1_public_inputs, verify_sp1_pairing_check_with_lines};
 
 pub fn main(
     a_x: [u128; 3],
@@ -20,19 +18,29 @@ pub fn main(
     public_values: [u8; 32],
     c: [[u128; 3]; 12],
     w: [[u128; 3]; 12],
+    lines: LineScheduleSp1,
+    b_lines_raw: LineScheduleSp1Raw,
+    b_line_witness: G2LineWitnessSp1,
 ) -> pub [Field; 2] {
-    let proof = Proof {
-        a: G1Affine { x: fp_from_limbs_checked(a_x), y: fp_from_limbs_checked(a_y) },
-        b: G2Affine {
-            x: Fp2 { c0: fp_from_limbs_checked(b_x_c0), c1: fp_from_limbs_checked(b_x_c1) },
-            y: Fp2 { c0: fp_from_limbs_checked(b_y_c0), c1: fp_from_limbs_checked(b_y_c1) },
-        },
-        c: G1Affine { x: fp_from_limbs_checked(c_x), y: fp_from_limbs_checked(c_y) },
-    };
-
     let c_fp12 = fp12_from_coeffs(c);
     let w_fp12 = fp12_from_coeffs(w);
-    let verified = verify_sp1_pairing_check(vkey, public_values, proof, c_fp12, w_fp12);
+    let verified = verify_sp1_pairing_check_with_lines(
+        vkey,
+        public_values,
+        a_x,
+        a_y,
+        b_x_c0,
+        b_x_c1,
+        b_y_c0,
+        b_y_c1,
+        c_x,
+        c_y,
+        c_fp12,
+        w_fp12,
+        lines,
+        b_lines_raw,
+        b_line_witness,
+    );
     assert(verified);
     sp1_public_inputs(vkey, public_values)
 }

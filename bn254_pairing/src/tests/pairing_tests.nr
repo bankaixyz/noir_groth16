@@ -1,10 +1,19 @@
 use crate::fp::Fp;
-use crate::fp2::Fp2;
+use crate::fp2::{Fp2, fp2_zero};
 use crate::fp6::Fp6;
 use crate::fp12::Fp12;
 use crate::g1::G1Affine;
-use crate::g2::G2Affine;
-use crate::pairing::{miller_loop, pairing, pairing_multi};
+use crate::g2::{
+    G2Affine,
+    LineEvaluation,
+    LineEvalAtP,
+    LineScheduleSp1,
+    frobenius_g2,
+    frobenius_square_g2,
+    neg_g2_affine,
+    projective_from_affine_g2,
+};
+use crate::pairing::{miller_loop, miller_loop_with_lines_sp1, pairing, pairing_multi};
 use bignum::BigNum;
 
 fn fp_from_limbs(l0: u128, l1: u128, l2: u128) -> Fp {
@@ -37,6 +46,104 @@ fn fp12_eq(a: Fp12, b: Fp12) -> bool {
     let c4 = fp2_eq(a.c1.b1, b.c1.b1);
     let c5 = fp2_eq(a.c1.b2, b.c1.b2);
     c0 & c1 & c2 & c3 & c4 & c5
+}
+
+fn zero_line_eval() -> LineEvalAtP {
+    let z = fp2_zero();
+    LineEvalAtP { r0: z, r1: z, r2: z }
+}
+
+fn line_eval_at_point(line: LineEvaluation, p: G1Affine) -> LineEvalAtP {
+    LineEvalAtP {
+        r0: line.r0.mul_by_element(p.y),
+        r1: line.r1.mul_by_element(p.x),
+        r2: line.r2,
+    }
+}
+
+fn sp1_loop_digits() -> [i8; 66] {
+    [
+        0, 0, 0, 1, 0, 1, 0, -1, 0, 0, -1, 0, 0, 0, 1, 0,
+        0, -1, 0, -1, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0, -1, 0,
+        0, 1, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, -1, 0, 0, -1,
+        0, 1, 0, -1, 0, 0, 0, -1, 0, -1, 0, 0, 0, 1, 0, -1,
+        0, 1,
+    ]
+}
+
+fn build_line_schedule_sp1(p_list: [G1Affine; 3], q_list: [G2Affine; 3]) -> LineScheduleSp1 {
+    let mut q_proj = [projective_from_affine_g2(q_list[0]); 3];
+    let mut q_neg = [neg_g2_affine(q_list[0]); 3];
+    for i in 0..3 {
+        q_proj[i] = projective_from_affine_g2(q_list[i]);
+        q_neg[i] = neg_g2_affine(q_list[i]);
+    }
+
+    let mut initial_doubles = [zero_line_eval(); 3];
+    for i in 0..3 {
+        let (qk, line) = q_proj[i].double_step();
+        q_proj[i] = qk;
+        initial_doubles[i] = line_eval_at_point(line, p_list[i]);
+    }
+
+    let mut pre_loop_lines = [zero_line_eval(); 3];
+    let mut pre_loop_adds = [zero_line_eval(); 3];
+    for i in 0..3 {
+        let (qk, line) = q_proj[i].line_compute(q_neg[i]);
+        q_proj[i] = qk;
+        pre_loop_lines[i] = line_eval_at_point(line, p_list[i]);
+        let (qk, line) = q_proj[i].add_mixed_step(q_list[i]);
+        q_proj[i] = qk;
+        pre_loop_adds[i] = line_eval_at_point(line, p_list[i]);
+    }
+
+    let mut loop_doubles = [[zero_line_eval(); 3]; 63];
+    let mut loop_adds_pos = [[zero_line_eval(); 3]; 63];
+    let mut loop_adds_neg = [[zero_line_eval(); 3]; 63];
+
+    let digits = sp1_loop_digits();
+    for idx in 0..63 {
+        let digit = digits[62 - idx];
+        for i in 0..3 {
+            let (qk, line) = q_proj[i].double_step();
+            q_proj[i] = qk;
+            loop_doubles[idx][i] = line_eval_at_point(line, p_list[i]);
+
+            if digit == 1i8 {
+                let (qk, line_add) = q_proj[i].add_mixed_step(q_list[i]);
+                q_proj[i] = qk;
+                loop_adds_pos[idx][i] = line_eval_at_point(line_add, p_list[i]);
+            } else if digit == -1i8 {
+                let (qk, line_add) = q_proj[i].add_mixed_step(q_neg[i]);
+                q_proj[i] = qk;
+                loop_adds_neg[idx][i] = line_eval_at_point(line_add, p_list[i]);
+            }
+        }
+    }
+
+    let mut final_adds = [zero_line_eval(); 3];
+    let mut final_lines = [zero_line_eval(); 3];
+    for i in 0..3 {
+        let q1 = frobenius_g2(q_list[i]);
+        let q2 = frobenius_square_g2(q_list[i]);
+        let (qk, line_add) = q_proj[i].add_mixed_step(q1);
+        q_proj[i] = qk;
+        final_adds[i] = line_eval_at_point(line_add, p_list[i]);
+        let (qk, line) = q_proj[i].line_compute(q2);
+        q_proj[i] = qk;
+        final_lines[i] = line_eval_at_point(line, p_list[i]);
+    }
+
+    LineScheduleSp1 {
+        initial_doubles,
+        pre_loop_lines,
+        pre_loop_adds,
+        loop_doubles,
+        loop_adds_pos,
+        loop_adds_neg,
+        final_adds,
+        final_lines,
+    }
 }
 
 fn g1_vector_single_generators() -> G1Affine {
@@ -305,4 +412,20 @@ fn pairing_multi_2_pairs_vectors_matches() {
     let result = pairing_multi([p0, p1], [q0, q1]);
     let expected = expected_pairing_multi_2_pairs();
     assert(fp12_eq(result, expected));
+}
+
+#[test]
+fn miller_loop_with_lines_sp1_matches_miller_loop() {
+    let p0 = g1_vector_single_generators();
+    let p1 = g1_vector_single_2g1_g2();
+    let p2 = g1_vector_single_generators();
+    let q0 = g2_vector_single_generators();
+    let q1 = g2_vector_single_generators();
+    let q2 = g2_vector_single_generators();
+    let p_list = [p0, p1, p2];
+    let q_list = [q0, q1, q2];
+    let lines = build_line_schedule_sp1(p_list, q_list);
+    let result = miller_loop(p_list, q_list);
+    let result_lines = miller_loop_with_lines_sp1(p_list, lines);
+    assert(fp12_eq(result, result_lines));
 }
