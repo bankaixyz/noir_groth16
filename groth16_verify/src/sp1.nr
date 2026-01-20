@@ -10,6 +10,7 @@ use noir_bn254_pairing::fp12::Fp12;
 use noir_bn254_pairing::g1::G1Affine;
 use noir_bn254_pairing::g2::{G2Affine, G2LineWitnessSp1, LineScheduleSp1, LineScheduleSp1Raw};
 use noir_bn254_pairing::BigNum;
+use poseidon::poseidon_hash;
 use sha256::sha256_var;
 
 /// Convert 32 big-endian bytes to a Field element.
@@ -48,16 +49,6 @@ fn hash_public_values<let N: u32>(public_values: [u8; N]) -> Field {
     hash_to_field(hash)
 }
 
-fn u128_to_le_bytes(value: u128) -> [u8; 16] {
-    let mut out = [0u8; 16];
-    let mut v = value;
-    for i in 0..16 {
-        out[i] = (v & 0xff) as u8;
-        v = v >> 8;
-    }
-    out
-}
-
 fn field_to_le_bytes32(value: Field) -> [u8; 32] {
     let bits: [u1; 254] = value.to_le_bits();
     let mut out = [0u8; 32];
@@ -73,6 +64,19 @@ fn field_to_le_bytes32(value: Field) -> [u8; 32] {
     out
 }
 
+fn field_to_be_bytes32(value: Field) -> [u8; 32] {
+    let le = field_to_le_bytes32(value);
+    let mut be = [0u8; 32];
+    for i in 0..32 {
+        be[i] = le[31 - i];
+    }
+    be
+}
+
+fn limb_to_field(value: u128) -> Field {
+    value as Field
+}
+
 fn derive_rho_sp1<let N: u32>(
     vkey: Field,
     public_values: [u8; N],
@@ -86,35 +90,23 @@ fn derive_rho_sp1<let N: u32>(
     c_y: [u128; 3],
 ) -> Fp {
     let public_inputs = sp1_public_inputs(vkey, public_values);
-    let input0_bytes = field_to_le_bytes32(public_inputs[0]);
-    let input1_bytes = field_to_le_bytes32(public_inputs[1]);
-
-    let mut data = [0u8; 448];
-    let mut offset: u32 = 0;
-
-    for i in 0..32 {
-        data[offset + i] = input0_bytes[i];
-    }
-    offset = offset + 32;
-    for i in 0..32 {
-        data[offset + i] = input1_bytes[i];
-    }
-    offset = offset + 32;
+    let mut inputs: [Field; 26] = [0; 26];
+    inputs[0] = public_inputs[0];
+    inputs[1] = public_inputs[1];
 
     let limb_sets = [a_x, a_y, b_x_c0, b_x_c1, b_y_c0, b_y_c1, c_x, c_y];
+    let mut idx: u32 = 2;
     for s in 0..8 {
         let limbs = limb_sets[s];
         for l in 0..3 {
-            let limb_bytes = u128_to_le_bytes(limbs[l]);
-            for i in 0..16 {
-                data[offset + i] = limb_bytes[i];
-            }
-            offset = offset + 16;
+            inputs[idx] = limb_to_field(limbs[l]);
+            idx = idx + 1;
         }
     }
 
-    let hash: [u8; 32] = sha256_var(data, 448);
-    bytes32_to_fp(hash)
+    let rho_field = poseidon_hash(inputs);
+    let rho_bytes = field_to_be_bytes32(rho_field);
+    bytes32_to_fp(rho_bytes)
 }
 
 /// SP1 public inputs: [vkey, H(public_values)] where H is SHA256.
