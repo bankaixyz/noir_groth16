@@ -6,17 +6,34 @@ constraints from the pairing verifier.
 
 ## Why randomized Fp12 checks did not help in Noir
 
-Noir's `bignum` multiplication is already constrained by a **single quadratic
-expression**:
+This optimization is based on an R1CS-style cost model where non-native
+multiplication expands into many limb constraints. In Noir, that assumption is
+false: `bignum` uses a **single quadratic expression** to constrain a multiply:
 
 ```
 lhs * rhs - result = 0
 ```
 
-So replacing those multiplications with randomized limb checks removes only a
-small number of constraints, while adding many native-field multiplications and
-Poseidon hashing. The net effect is neutral or worse. The remaining cost is
-dominated by **G2 arithmetic and line processing** inside the Miller loop.
+That means the pairing path already gets very cheap Fp/Fp2/Fp12 multiplications
+for the bignum parts we tried to replace. When we swap those for randomized
+checks, we **remove ~1 constraint per multiply** but **add**:
+
+- multiple native-field multiplies per check (limb evaluation at `rho`)
+- batched accumulator updates (`alpha` powers)
+- extra Poseidon hashing for `rho/alpha`
+- additional witness plumbing (more inputs, more loads)
+
+So the randomized path is *net more expensive* under Noir's bignum model.
+
+There is also a **scope mismatch**: we randomized only Fp12/Fp6/Fp2 operations
+inside the pairing accumulator, but the dominant costs live elsewhere:
+
+- G2 line arithmetic (`double_step`, `add_mixed_step`, `line_compute`)
+- line evaluation at G1 points (`Fp2 * Fp`)
+- line multiplication (`mul_034_by_034`)
+
+These are still executed with bignum arithmetic and dominate total constraints,
+so optimizing Fp12 alone cannot move the needle by ~1M in this backend.
 
 ## Where the constraints actually live
 
