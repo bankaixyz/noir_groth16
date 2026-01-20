@@ -1,7 +1,8 @@
 use crate::types::Proof;
-use crate::verify::verify_sp1_fast;
+use crate::verify::{verify_sp1_fast, verify_sp1_pairing_check as verify_sp1_pairing_check_impl};
 use noir_bn254_pairing::fp::Fp;
 use noir_bn254_pairing::fp2::Fp2;
+use noir_bn254_pairing::fp12::Fp12;
 use noir_bn254_pairing::g1::G1Affine;
 use noir_bn254_pairing::g2::G2Affine;
 use noir_bn254_pairing::BigNum;
@@ -55,6 +56,18 @@ pub fn verify_sp1<let N: u32>(
 ) -> bool {
     let public_inputs = sp1_public_inputs(vkey, public_values);
     verify_sp1_fast(proof, public_inputs)
+}
+
+/// Verifies an SP1 Groth16 proof using the PairingCheck fast path.
+pub fn verify_sp1_pairing_check<let N: u32>(
+    vkey: Field,
+    public_values: [u8; N],
+    proof: Proof,
+    c: Fp12,
+    w: Fp12,
+) -> bool {
+    let public_inputs = sp1_public_inputs(vkey, public_values);
+    verify_sp1_pairing_check_impl(proof, public_inputs, c, w)
 }
 
 /// Build an Fp element from 3 u128 limbs (BN254 limb order).

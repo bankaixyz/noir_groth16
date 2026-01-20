@@ -77,6 +77,35 @@ fn alpha_beta() -> Fp12 {
     fp12_from(fp6_from(c0_b0, c0_b1, c0_b2), fp6_from(c1_b0, c1_b1, c1_b2))
 }
 
+/// SP1 pairing-check preimage: FE(t_preimage) = alpha_beta^{-1}.
+pub fn sp1_t_preimage() -> Fp12 {
+    let c0_b0 = fp2_from_limbs(
+        [0x7b420c60b525f2c2ce1b86d3dc3a47, 0x5a17324144f5ca03d8895d392e1f0c, 0x2a86],
+        [0xb868080ab2c8a10bd11082150d127e, 0x8902d60c3ba260898ec31a80f239cd, 0x48f],
+    );
+    let c0_b1 = fp2_from_limbs(
+        [0x1413871624c083e0d0d9f7474b053b, 0xa5dfca40eafe7bc29574d688d7868b, 0xdf4],
+        [0xb598aee4203cda5bd3ec475ebc05d, 0x57129cf82e823378aaf0ef031d368e, 0xa8d],
+    );
+    let c0_b2 = fp2_from_limbs(
+        [0x48efb18f71d70ab0d6c95b37409239, 0x754ec3d38dcd5bf6af76d344b122cd, 0xd4b],
+        [0x87e39d995fd0c3dcfa43e0853ea55f, 0x89e6dd2d3afc2315e30ba143f47c24, 0x304e],
+    );
+    let c1_b0 = fp2_from_limbs(
+        [0x298cbab09bde939f39ccc38c3e318c, 0x35ea04fef8bc069b6f8e6603781e7a, 0x2368],
+        [0xd3bab083cdb5c91855e0901df5f711, 0xcd04ba04b1c347de7f01165c9b34e7, 0x1281],
+    );
+    let c1_b1 = fp2_from_limbs(
+        [0x1fa3980da8295955f050bb692a8d41, 0x1d4665534b60afb19700728dda291c, 0xbe3],
+        [0x34bd7c551b4308fda1646559f62643, 0x8bc79905ba6ff916718025803684b6, 0x118b],
+    );
+    let c1_b2 = fp2_from_limbs(
+        [0x195895c047336e9af7ab69f32981ac, 0xc78eb182f98904fa8b0ab7f3e47693, 0x2fa],
+        [0xe067face779b826d7aa5fa68d04881, 0x8515c249d1583929f91077f85ddb8b, 0x725],
+    );
+    fp12_from(fp6_from(c0_b0, c0_b1, c0_b2), fp6_from(c1_b0, c1_b1, c1_b2))
+}
+
 /// SP1 Groth16 verifying key constants.
 pub fn sp1_vk() -> VerifyingKey<3> {
     let ic0 = G1Affine {
