@@ -10,7 +10,7 @@ use noir_bn254_pairing::fp12::Fp12;
 use noir_bn254_pairing::g1::G1Affine;
 use noir_bn254_pairing::g2::{G2Affine, G2LineWitnessSp1, LineScheduleSp1, LineScheduleSp1Raw};
 use noir_bn254_pairing::BigNum;
-use poseidon::poseidon_hash;
+use poseidon::poseidon2::Poseidon2;
 use sha256::sha256_var;
 
 /// Convert 32 big-endian bytes to a Field element.
@@ -104,7 +104,7 @@ fn derive_rho_sp1<let N: u32>(
         }
     }
 
-    let rho_field = poseidon_hash(inputs);
+    let rho_field = Poseidon2::hash(inputs, inputs.len());
     let rho_bytes = field_to_be_bytes32(rho_field);
     bytes32_to_fp(rho_bytes)
 }
