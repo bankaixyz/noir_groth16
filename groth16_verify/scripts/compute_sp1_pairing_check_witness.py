@@ -54,8 +54,6 @@ def fp_inv(a: int) -> int:
 
 @dataclass(frozen=True)
 class FpMulWitness:
-    a: int
-    b: int
     c: int
     q: int
 
@@ -77,7 +75,7 @@ def fp_mul_trace(a: int, b: int, trace: PairingMulTraceBuilder) -> int:
     prod = a * b
     c = prod % P
     q = (prod - c) // P
-    trace.fp_mul.append(FpMulWitness(a % P, b % P, c, q))
+    trace.fp_mul.append(FpMulWitness(c, q))
     return c
 
 
@@ -1420,7 +1418,7 @@ def pad_trace(trace: PairingMulTraceBuilder, pair_count: int) -> None:
     pad_list(trace.fp12_mul_by_01234, target_mul_by_01234, Fp12.zero())
     pad_list(trace.fp12_square, target_squares, Fp12.zero())
     pad_list(trace.fp12_mul, target_muls, Fp12.zero())
-    pad_list(trace.fp_mul, target_fp_mul, FpMulWitness(0, 0, 0, 0))
+    pad_list(trace.fp_mul, target_fp_mul, FpMulWitness(0, 0))
 
 
 def limbs_as_strings(values: Iterable[int]) -> List[str]:
@@ -1433,8 +1431,6 @@ def fp12_to_limb_list(z: Fp12) -> List[List[str]]:
 
 def fp_mul_witness_to_limbs(witness: FpMulWitness) -> dict:
     return {
-        "a": limbs_as_strings(fp_to_limbs(witness.a)),
-        "b": limbs_as_strings(fp_to_limbs(witness.b)),
         "c": limbs_as_strings(fp_to_limbs(witness.c)),
         "q": limbs_as_strings(int_to_limbs(witness.q)),
     }

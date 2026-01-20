@@ -1,4 +1,4 @@
-use crate::fp::{Fp, fp_from_limbs_checked};
+use crate::fp::{Fp, fp_from_limbs_checked, fp_to_limbs};
 use crate::fp2::Fp2;
 use crate::fp6::Fp6;
 use crate::fp12::Fp12;
@@ -57,16 +57,15 @@ fn fp6_int_add(a: Fp6Int, b: Fp6Int) -> Fp6Int {
 }
 
 fn fp_mul_witness_from_int(a: u128, b: u128) -> FpMulWitness {
+    let c = fp_from_u128(a * b);
     FpMulWitness {
-        a: limbs_from_u128(a),
-        b: limbs_from_u128(b),
-        c: limbs_from_u128(a * b),
+        c: fp_to_limbs(c),
         q: [0, 0, 0],
     }
 }
 
 fn fp2_mul_witnesses_int(a: Fp2Int, b: Fp2Int) -> [FpMulWitness; 3] {
-    let mut out = [FpMulWitness { a: [0, 0, 0], b: [0, 0, 0], c: [0, 0, 0], q: [0, 0, 0] }; 3];
+    let mut out = [FpMulWitness { c: [0, 0, 0], q: [0, 0, 0] }; 3];
     let a0 = a.c0 + a.c1;
     let b0 = b.c0 + b.c1;
     out[0] = fp_mul_witness_from_int(a0, b0);
@@ -76,7 +75,7 @@ fn fp2_mul_witnesses_int(a: Fp2Int, b: Fp2Int) -> [FpMulWitness; 3] {
 }
 
 fn fp2_square_witnesses_int(a: Fp2Int) -> [FpMulWitness; 2] {
-    let mut out = [FpMulWitness { a: [0, 0, 0], b: [0, 0, 0], c: [0, 0, 0], q: [0, 0, 0] }; 2];
+    let mut out = [FpMulWitness { c: [0, 0, 0], q: [0, 0, 0] }; 2];
     let a0 = a.c0 + a.c1;
     let b0 = a.c0 - a.c1;
     out[0] = fp_mul_witness_from_int(a0, b0);
@@ -127,7 +126,7 @@ fn copy12_into42(mut out: [FpMulWitness; 42], start: u32, src: [FpMulWitness; 12
 }
 
 fn fp6_mul_witnesses_int(a: Fp6Int, b: Fp6Int) -> [FpMulWitness; 18] {
-    let mut out = [FpMulWitness { a: [0, 0, 0], b: [0, 0, 0], c: [0, 0, 0], q: [0, 0, 0] }; 18];
+    let mut out = [FpMulWitness { c: [0, 0, 0], q: [0, 0, 0] }; 18];
     out = copy3_into18(out, 0, fp2_mul_witnesses_int(a.b0, b.b0));
     out = copy3_into18(out, 3, fp2_mul_witnesses_int(a.b1, b.b1));
     out = copy3_into18(out, 6, fp2_mul_witnesses_int(a.b2, b.b2));
@@ -138,7 +137,7 @@ fn fp6_mul_witnesses_int(a: Fp6Int, b: Fp6Int) -> [FpMulWitness; 18] {
 }
 
 fn fp6_square_witnesses_int(a: Fp6Int) -> [FpMulWitness; 12] {
-    let mut out = [FpMulWitness { a: [0, 0, 0], b: [0, 0, 0], c: [0, 0, 0], q: [0, 0, 0] }; 12];
+    let mut out = [FpMulWitness { c: [0, 0, 0], q: [0, 0, 0] }; 12];
     out = copy3_into12(out, 0, fp2_mul_witnesses_int(a.b0, a.b1));
     out = copy2_into12(out, 3, fp2_square_witnesses_int(a.b2));
     out = copy2_into12(out, 5, fp2_square_witnesses_int(a.b0));
@@ -149,7 +148,7 @@ fn fp6_square_witnesses_int(a: Fp6Int) -> [FpMulWitness; 12] {
 }
 
 fn fp12_mul_witnesses_int(a: Fp12Int, b: Fp12Int) -> [FpMulWitness; 54] {
-    let mut out = [FpMulWitness { a: [0, 0, 0], b: [0, 0, 0], c: [0, 0, 0], q: [0, 0, 0] }; 54];
+    let mut out = [FpMulWitness { c: [0, 0, 0], q: [0, 0, 0] }; 54];
     let a0 = fp6_int_add(a.c0, a.c1);
     let b0 = fp6_int_add(b.c0, b.c1);
     out = copy18_into54(out, 0, fp6_mul_witnesses_int(a0, b0));
@@ -159,7 +158,7 @@ fn fp12_mul_witnesses_int(a: Fp12Int, b: Fp12Int) -> [FpMulWitness; 54] {
 }
 
 fn fp12_square_witnesses_int(a: Fp12Int) -> [FpMulWitness; 42] {
-    let mut out = [FpMulWitness { a: [0, 0, 0], b: [0, 0, 0], c: [0, 0, 0], q: [0, 0, 0] }; 42];
+    let mut out = [FpMulWitness { c: [0, 0, 0], q: [0, 0, 0] }; 42];
     out = copy18_into42(out, 0, fp6_mul_witnesses_int(a.c0, a.c1));
     out = copy12_into42(out, 18, fp6_square_witnesses_int(a.c0));
     out = copy12_into42(out, 30, fp6_square_witnesses_int(a.c1));
