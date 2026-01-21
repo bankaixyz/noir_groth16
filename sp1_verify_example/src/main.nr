@@ -16,7 +16,7 @@ pub fn main(
     c_y: [u128; 3],
     vkey: Field,
     public_values: [u8; 32],
-    pub rho_seed: Field,
+    rho_seed: Field,
     c: [[u128; 3]; 12],
     w: [[u128; 3]; 12],
     lines: LineSchedule,
