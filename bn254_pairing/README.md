@@ -17,8 +17,9 @@ Core pairing entrypoints:
 
 - `pairing(p: G1Affine, q: G2Affine) -> Fp12`
 - `pairing_multi(p: [G1Affine; N], q: [G2Affine; N]) -> Fp12`
-- `miller_loop(p: [G1Affine; N], q: [G2Affine; N]) -> Fp12`
-- `final_exponentiation(z: Fp12) -> Fp12`
+- `pairing_check_optimized(p_list: [G1Affine; 3], q_list: [G2Affine; 3], t_preimage, delta_lines, gamma_lines, lines, b_lines_raw, b_line_witness, rho, c, w) -> bool`
+
+Only these entrypoints are intended for external use.
 
 Curve helpers you can `assert` against in your circuit:
 
@@ -45,17 +46,11 @@ The implementation uses several circuit-friendly optimizations:
   `mul_034_by_034`, and `mul_by_01234` to avoid full Fp12 multiplies.
 - **Mixed additions on G2**: `double_step` and `add_mixed_step` avoid affine inversion
   costs and keep line evaluations cheap.
+- **Pre-evaluated line schedule**: `pairing_check_optimized` consumes witnessed line
+  coefficients and validates them, skipping in-circuit G2 arithmetic for the Miller loop.
+- **Preimage pairing check**: uses a preimage `t_preimage` and witnesses `(c, w)` to
+  reduce the final exponentiation to a single `is_one` check.
 - **Frobenius shortcuts**: final exponentiation uses `frobenius`, `frobenius_square`,
   and `cyclotomic_square` once the element is in the cyclotomic subgroup.
 
-## Performance notes
-
-These figures are measured in a Noir circuit and are intended as rough guidance.
-Some tests are slow.
-
-| Pairings | Constraints | ACIR opcodes | Proving time |
-| --- | --- | --- | --- |
-| 2 | 1,812,974 | 8,196 | 15.38s |
-| 3 | 2,035,715 | 8,196 | 16.0s |
-| 4 | 2,227,841 | 8,912 | 16.7s |
 

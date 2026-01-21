@@ -1,6 +1,7 @@
 **/target
 **/.DS_Store
-**/out
+**/out/
+**/out/**
 .cursor
 .cache
 .pydeps
