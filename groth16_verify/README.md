@@ -1,7 +1,7 @@
 # Groth16 Verify in Noir
 
-This package provides a Groth16 verifier over BN254, with a fast SP1-specific
-path for two public inputs.
+This package provides a Groth16 verifier over BN254, with an optimized path
+and an SP1 wrapper for two public inputs.
 
 ## Cryptography summary
 
@@ -11,7 +11,7 @@ path for two public inputs.
   and checks G2 subgroup membership for proof points.
 - **Public inputs**: inputs are BN254 scalars; the SP1 path hashes public values
   with SHA256 and masks to 253 bits to stay in the scalar field.
-- **MSM optimization**: the SP1 fast path uses a joint-window MSM (Straus/Shamir)
+- **MSM optimization**: the optimized path uses a joint-window MSM (Straus/Shamir)
   with precomputed table entries a*IC1 + b*IC2 for 3-bit digits.
 
 ## Main API
@@ -19,12 +19,12 @@ path for two public inputs.
 Generic verifier:
 
 - `verify(vk, proof, public_inputs) -> bool`
+- `verify_optimized(vk, proof, public_inputs, msm2_w3_table, t_preimage, delta_lines, gamma_lines, lines, b_lines_raw, b_line_witness, rho, c, w) -> bool`
 
 SP1 verifier (two inputs):
 
-- `verify_sp1(vkey, public_values, proof) -> bool`
-- `verify_sp1_fast(proof, public_inputs) -> bool`
-- `verify_sp1_fast_with_table(vk, proof, public_inputs, msm2_w3_table) -> bool`
+- `sp1::verify(vkey, public_values, proof) -> bool`
+- `sp1::verify_optimized(vkey, public_values, a_x, a_y, b_x_c0, b_x_c1, b_y_c0, b_y_c1, c_x, c_y, c, w, lines, b_lines_raw, b_line_witness) -> bool`
 
 Core types:
 
@@ -45,12 +45,13 @@ SP1 exposes two public inputs:
 - `input0 = vkey`
 - `input1 = sha256(public_values)` masked to 253 bits
 
-`verify_sp1` computes these inputs and calls the fast verifier path.
-Use `verify_sp1_fast_with_table` only with trusted constant VKs/tables.
+`sp1::verify` computes these inputs and calls the generic verifier.
+`sp1::verify_optimized` additionally derives `rho`, validates the line schedule,
+and uses the preimage pairing check.
 
 ## Optimization notes
 
-The SP1 path uses a 3-bit joint-window MSM (w = 3) for two scalars:
+The optimized path uses a 3-bit joint-window MSM (w = 3) for two scalars:
 
 - **Precomputed table**: `sp1_msm2_w3_table` stores all `a*ic1 + b*ic2`
   combinations for 3-bit digits.
@@ -58,6 +59,10 @@ The SP1 path uses a 3-bit joint-window MSM (w = 3) for two scalars:
   reducing additions vs. a per-scalar double-and-add.
 - **Mixed add**: `add_g1_jac_mixed` is used because the table entries are affine
   constants, lowering per-add constraints.
+- **Line schedules**: fixed G2 pairings use precomputed lines; the variable B
+  pairing uses witnessed line steps validated in-circuit.
+- **Preimage pairing check**: the pairing product is verified via `(t_preimage, c, w)`
+  to avoid a full final exponentiation.
 
 ## Performance notes
 

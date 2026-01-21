@@ -1,15 +1,15 @@
 # `noir_groth16_verify` (Groth16 Verify on BN254) — Contributor Guide
 
-This package provides a Groth16 verifier over BN254 built on `noir_bn254_pairing`, plus an SP1-specific fast path for the “two public inputs” format used by SP1.
+This package provides a Groth16 verifier over BN254 built on `noir_bn254_pairing`, plus an SP1 wrapper and optimized path for the “two public inputs” format used by SP1.
 
 ## Key entrypoints
 
 - `src/verify.nr`
   - `verify::<N, L>(vk, proof, public_inputs) -> bool`
-  - `verify_sp1_fast(proof, public_inputs) -> bool`
-  - `verify_sp1_fast_with_table(vk, proof, public_inputs, msm2_w3_table) -> bool`
+  - `verify_optimized(vk, proof, public_inputs, msm2_w3_table, t_preimage, delta_lines, gamma_lines, lines, b_lines_raw, b_line_witness, rho, c, w) -> bool`
 - `src/sp1.nr`
-  - `verify_sp1::<N>(vkey, public_values, proof) -> bool`
+  - `verify::<N>(vkey, public_values, proof) -> bool`
+  - `verify_optimized::<N>(vkey, public_values, a_x, a_y, b_x_c0, b_x_c1, b_y_c0, b_y_c1, c_x, c_y, c, w, lines, b_lines_raw, b_line_witness) -> bool`
   - `sp1_public_inputs(vkey, public_values) -> [Field; 2]`
 - `src/types.nr`
   - `Proof { a, b, c }`
@@ -33,7 +33,7 @@ SP1 exposes two public inputs:
 
 Implementation details:
 
-- `src/sp1.nr` hashes/masks and then calls `verify_sp1_fast`.
+- `src/sp1.nr` hashes/masks and then calls the generic/optimized verifier.
 - `src/config/sp1.nr` contains the embedded SP1 verifying key and the precomputed 2-scalar MSM table.
 - `scripts/` contains helpers to regenerate SP1 constants/tables used in `src/config/sp1.nr`.
 - `SP1_NOIR_SPEC.md` documents the constant formats and hashing rules.

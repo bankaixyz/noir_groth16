@@ -8,8 +8,10 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import random
 import sys
+import time
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple
 
@@ -672,6 +674,65 @@ class LineEvaluation:
     r2: Fp2
 
 
+def fp2_sample_hex(z: Fp2) -> dict:
+    return {"c0": hex(z.c0), "c1": hex(z.c1)}
+
+
+def line_sample_hex(line: LineEvaluation) -> dict:
+    return {"r0": fp2_sample_hex(line.r0), "r1": fp2_sample_hex(line.r1), "r2": fp2_sample_hex(line.r2)}
+
+
+@dataclass(frozen=True)
+class LineScheduleRaw:
+    initial_double: LineEvaluation
+    pre_loop_line: LineEvaluation
+    pre_loop_add: LineEvaluation
+    loop_doubles: List[LineEvaluation]
+    loop_adds_pos: List[LineEvaluation]
+    loop_adds_neg: List[LineEvaluation]
+    final_add: LineEvaluation
+    final_line: LineEvaluation
+
+
+@dataclass(frozen=True)
+class G2DoubleStepWitness:
+    a: Fp2
+    b: Fp2
+    c: Fp2
+    ee: Fp2
+
+
+@dataclass(frozen=True)
+class G2AddStepWitness:
+    c: Fp2
+    d: Fp2
+    e: Fp2
+    f: Fp2
+    g: Fp2
+    t1: Fp2
+    t2: Fp2
+
+
+@dataclass(frozen=True)
+class G2LineComputeWitness:
+    t2: Fp2
+
+
+@dataclass(frozen=True)
+class G2LineWitness:
+    double_witnesses: List[G2DoubleStepWitness]
+    double_outputs: List[G2Proj]
+    pre_loop_line_witness: G2LineComputeWitness
+    pre_loop_add_witness: G2AddStepWitness
+    pre_loop_add_output: G2Proj
+    loop_add_witness_pos: List[G2AddStepWitness]
+    loop_add_witness_neg: List[G2AddStepWitness]
+    loop_add_outputs: List[G2Proj]
+    final_add_witness: G2AddStepWitness
+    final_add_output: G2Proj
+    final_line_witness: G2LineComputeWitness
+
+
 def projective_from_affine_g2(a: G2Affine) -> G2Proj:
     if a.is_infinity():
         return G2Proj(fp2_one(), fp2_one(), fp2_zero())
@@ -696,6 +757,601 @@ def line_eval_at_point(line: LineEvaluation, p: G1Affine) -> LineEvaluation:
         r1=line.r1.mul_by_element(p.x),
         r2=line.r2,
     )
+
+
+def fp2_eq(a: Fp2, b: Fp2) -> bool:
+    return a.c0 == b.c0 and a.c1 == b.c1
+
+
+def fp2_compress(a: Fp2, rho: int) -> int:
+    return (a.c0 + fp_mul(a.c1, rho)) % P
+
+
+def fp2_mul_compressed_check(a: Fp2, b: Fp2, c: Fp2, rho: int) -> bool:
+    return fp_mul(fp2_compress(a, rho), fp2_compress(b, rho)) == fp2_compress(c, rho)
+
+
+def fp2_mul_check_full(a: Fp2, b: Fp2, c: Fp2) -> bool:
+    prod = a.mul(b)
+    return fp2_eq(prod, c)
+
+
+def line_eval_matches_p(line: LineEvaluation, eval_line: LineEvaluation, p: G1Affine) -> bool:
+    expected = line_eval_at_point(line, p)
+    return fp2_eq(expected.r0, eval_line.r0) and fp2_eq(expected.r1, eval_line.r1) and fp2_eq(expected.r2, eval_line.r2)
+
+
+def g2_proj_eq(a: G2Proj, b: G2Proj) -> bool:
+    return fp2_eq(a.x, b.x) and fp2_eq(a.y, b.y) and fp2_eq(a.z, b.z)
+
+
+def check_double_step_witness(
+    p: G1Affine,
+    state: G2Proj,
+    state_next: G2Proj,
+    line: LineEvaluation,
+    line_eval: LineEvaluation,
+    wit: G2DoubleStepWitness,
+    rho: int,
+) -> bool:
+    ok = line_eval_matches_p(line, line_eval, p)
+
+    inv_two = fp_inv(2)
+    inv_three = fp_inv(3)
+
+    a = wit.a
+    b = wit.b
+    c = wit.c
+    ee = wit.ee
+
+    h = line.r0.neg()
+    j = line.r1.mul_by_element(inv_three)
+    e = line.r2.add(b)
+    d = c.mul_by_element(3)
+    f = e.mul_by_element(3)
+    k = ee.mul_by_element(3)
+    g = b.add(f).mul_by_element(inv_two)
+
+    ok = ok and fp2_mul_compressed_check(state.x, state.y, a.double(), rho)
+    ok = ok and fp2_mul_compressed_check(state.y, state.y, b, rho)
+    ok = ok and fp2_mul_compressed_check(state.z, state.z, c, rho)
+    ok = ok and fp2_mul_compressed_check(d, B_TWIST, e, rho)
+    ok = ok and fp2_mul_compressed_check(state.x, state.x, j, rho)
+    ok = ok and fp2_mul_compressed_check(e, e, ee, rho)
+
+    yz = state.y.add(state.z)
+    rhs_h = b.add(c).sub(line.r0)
+    ok = ok and fp2_mul_compressed_check(yz, yz, rhs_h, rho)
+
+    b_minus_f = b.sub(f)
+    ok = ok and fp2_mul_compressed_check(b_minus_f, a, state_next.x, rho)
+
+    y_rhs = state_next.y.add(k)
+    ok = ok and fp2_mul_compressed_check(g, g, y_rhs, rho)
+
+    ok = ok and fp2_mul_compressed_check(b, h, state_next.z, rho)
+
+    return ok
+
+
+def check_double_step_witness_detail(
+    p: G1Affine,
+    state: G2Proj,
+    state_next: G2Proj,
+    line: LineEvaluation,
+    line_eval: LineEvaluation,
+    wit: G2DoubleStepWitness,
+    rho: int,
+) -> Tuple[bool, dict]:
+    detail = {
+        "line_eval_ok": line_eval_matches_p(line, line_eval, p),
+        "rho_sq_plus_one_zero": (fp_mul(rho, rho) + 1) % P == 0,
+        "first_fail": "",
+        "first_fail_compressed_ok": True,
+        "first_fail_full_ok": True,
+    }
+
+    inv_two = fp_inv(2)
+    inv_three = fp_inv(3)
+
+    a = wit.a
+    b = wit.b
+    c = wit.c
+    ee = wit.ee
+
+    h = line.r0.neg()
+    j = line.r1.mul_by_element(inv_three)
+    e = line.r2.add(b)
+    d = c.mul_by_element(3)
+    f = e.mul_by_element(3)
+    k = ee.mul_by_element(3)
+    g = b.add(f).mul_by_element(inv_two)
+
+    checks = [
+        ("state_x_y_eq_a2", state.x, state.y, a.double()),
+        ("state_y_y_eq_b", state.y, state.y, b),
+        ("state_z_z_eq_c", state.z, state.z, c),
+        ("d_mul_btwist_eq_e", d, B_TWIST, e),
+        ("state_x_x_eq_j", state.x, state.x, j),
+        ("e_e_eq_ee", e, e, ee),
+        ("yz_yz_eq_rhs_h", state.y.add(state.z), state.y.add(state.z), b.add(c).sub(line.r0)),
+        ("b_minus_f_mul_a_eq_x", b.sub(f), a, state_next.x),
+        ("g_g_eq_y_rhs", g, g, state_next.y.add(k)),
+        ("b_h_eq_z", b, h, state_next.z),
+    ]
+
+    for name, left, right, expected in checks:
+        compressed_ok = fp2_mul_compressed_check(left, right, expected, rho)
+        full_ok = fp2_mul_check_full(left, right, expected)
+        if not compressed_ok and detail["first_fail"] == "":
+            detail["first_fail"] = name
+            detail["first_fail_compressed_ok"] = compressed_ok
+            detail["first_fail_full_ok"] = full_ok
+
+    ok = detail["line_eval_ok"]
+    for name, left, right, expected in checks:
+        ok = ok and fp2_mul_compressed_check(left, right, expected, rho)
+
+    return ok, detail
+
+
+def check_add_step_witness(
+    p: G1Affine,
+    state: G2Proj,
+    state_next: G2Proj,
+    a_aff: G2Affine,
+    line: LineEvaluation,
+    line_eval: LineEvaluation,
+    wit: G2AddStepWitness,
+    rho: int,
+) -> bool:
+    ok = line_eval_matches_p(line, line_eval, p)
+
+    l = line.r0
+    o = line.r1.neg()
+    j = line.r2
+
+    x2z1 = state.x.sub(l)
+    y2z1 = state.y.sub(o)
+    ok = ok and fp2_mul_compressed_check(a_aff.x, state.z, x2z1, rho)
+    ok = ok and fp2_mul_compressed_check(a_aff.y, state.z, y2z1, rho)
+
+    ok = ok and fp2_mul_compressed_check(l, a_aff.y, wit.t2, rho)
+    ok = ok and fp2_mul_compressed_check(a_aff.x, o, j.add(wit.t2), rho)
+
+    ok = ok and fp2_mul_compressed_check(o, o, wit.c, rho)
+    ok = ok and fp2_mul_compressed_check(l, l, wit.d, rho)
+    ok = ok and fp2_mul_compressed_check(l, wit.d, wit.e, rho)
+    ok = ok and fp2_mul_compressed_check(state.z, wit.c, wit.f, rho)
+    ok = ok and fp2_mul_compressed_check(state.x, wit.d, wit.g, rho)
+    ok = ok and fp2_mul_compressed_check(state.y, wit.e, wit.t1, rho)
+
+    h = wit.e.add(wit.f).sub(wit.g.double())
+    ok = ok and fp2_mul_compressed_check(l, h, state_next.x, rho)
+
+    y_rhs = state_next.y.add(wit.t1)
+    ok = ok and fp2_mul_compressed_check(wit.g.sub(h), o, y_rhs, rho)
+
+    ok = ok and fp2_mul_compressed_check(wit.e, state.z, state_next.z, rho)
+
+    return ok
+
+
+def check_line_compute_witness(
+    p: G1Affine,
+    state: G2Proj,
+    a_aff: G2Affine,
+    line: LineEvaluation,
+    line_eval: LineEvaluation,
+    wit: G2LineComputeWitness,
+    rho: int,
+) -> bool:
+    ok = line_eval_matches_p(line, line_eval, p)
+
+    l = line.r0
+    o = line.r1.neg()
+    j = line.r2
+
+    x2z1 = state.x.sub(l)
+    y2z1 = state.y.sub(o)
+    ok = ok and fp2_mul_compressed_check(a_aff.x, state.z, x2z1, rho)
+    ok = ok and fp2_mul_compressed_check(a_aff.y, state.z, y2z1, rho)
+
+    ok = ok and fp2_mul_compressed_check(l, a_aff.y, wit.t2, rho)
+    ok = ok and fp2_mul_compressed_check(a_aff.x, o, j.add(wit.t2), rho)
+
+    return ok
+
+
+def check_b_line_witness_sp1_offchain(
+    p: G1Affine,
+    q: G2Affine,
+    raw_lines: "LineScheduleRaw",
+    eval_lines: "LineScheduleRaw",
+    witness: G2LineWitness,
+    rho: int,
+) -> Tuple[bool, str, dict]:
+    q_neg = q.neg()
+    q1 = frobenius_g2(q)
+    q2 = frobenius_square_g2(q)
+    detail: dict = {}
+
+    state = projective_from_affine_g2(q)
+    double0 = witness.double_outputs[0]
+    ok0, detail0 = check_double_step_witness_detail(
+        p,
+        state,
+        double0,
+        raw_lines.initial_double,
+        eval_lines.initial_double,
+        witness.double_witnesses[0],
+        rho,
+    )
+    detail["double_step_0"] = detail0
+    if not ok0:
+        return False, "double_step idx=0", detail
+    state = double0
+
+    if not check_line_compute_witness(
+        p,
+        state,
+        q_neg,
+        raw_lines.pre_loop_line,
+        eval_lines.pre_loop_line,
+        witness.pre_loop_line_witness,
+        rho,
+    ):
+        return False, "pre_loop_line", detail
+
+    pre_loop_add_out = witness.pre_loop_add_output
+    if not check_add_step_witness(
+        p,
+        state,
+        pre_loop_add_out,
+        q,
+        raw_lines.pre_loop_add,
+        eval_lines.pre_loop_add,
+        witness.pre_loop_add_witness,
+        rho,
+    ):
+        return False, "pre_loop_add", detail
+    state = pre_loop_add_out
+
+    digits = loop_counter()
+    for idx in range(63):
+        digit = digits[62 - idx]
+        double_out = witness.double_outputs[idx + 1]
+        if not check_double_step_witness(
+            p,
+            state,
+            double_out,
+            raw_lines.loop_doubles[idx],
+            eval_lines.loop_doubles[idx],
+            witness.double_witnesses[idx + 1],
+            rho,
+        ):
+            return False, f"loop_double idx={idx}", detail
+
+        if digit == 1:
+            add_out = witness.loop_add_outputs[idx]
+            if not check_add_step_witness(
+                p,
+                double_out,
+                add_out,
+                q,
+                raw_lines.loop_adds_pos[idx],
+                eval_lines.loop_adds_pos[idx],
+                witness.loop_add_witness_pos[idx],
+                rho,
+            ):
+                return False, f"loop_add_pos idx={idx}", detail
+            state = add_out
+        elif digit == -1:
+            add_out = witness.loop_add_outputs[idx]
+            if not check_add_step_witness(
+                p,
+                double_out,
+                add_out,
+                q_neg,
+                raw_lines.loop_adds_neg[idx],
+                eval_lines.loop_adds_neg[idx],
+                witness.loop_add_witness_neg[idx],
+                rho,
+            ):
+                return False, f"loop_add_neg idx={idx}", detail
+            state = add_out
+        else:
+            add_out = witness.loop_add_outputs[idx]
+            if not g2_proj_eq(double_out, add_out):
+                return False, f"loop_add_zero idx={idx}", detail
+            state = add_out
+
+    final_add_out = witness.final_add_output
+    if not check_add_step_witness(
+        p,
+        state,
+        final_add_out,
+        q1,
+        raw_lines.final_add,
+        eval_lines.final_add,
+        witness.final_add_witness,
+        rho,
+    ):
+        return False, "final_add", detail
+    state = final_add_out
+
+    if not check_line_compute_witness(
+        p,
+        state,
+        q2,
+        raw_lines.final_line,
+        eval_lines.final_line,
+        witness.final_line_witness,
+        rho,
+    ):
+        return False, "final_line", detail
+
+    return True, "", detail
+
+
+def zero_line() -> LineEvaluation:
+    z = fp2_zero()
+    return LineEvaluation(z, z, z)
+
+
+def zero_double_witness() -> G2DoubleStepWitness:
+    z = fp2_zero()
+    return G2DoubleStepWitness(z, z, z, z)
+
+
+def zero_add_witness() -> G2AddStepWitness:
+    z = fp2_zero()
+    return G2AddStepWitness(z, z, z, z, z, z, z)
+
+
+def zero_line_compute_witness() -> G2LineComputeWitness:
+    return G2LineComputeWitness(fp2_zero())
+
+
+def double_step_with_witness(p: G2Proj) -> Tuple[G2Proj, LineEvaluation, G2DoubleStepWitness]:
+    a = p.x.mul(p.y).halve()
+    b = p.y.square()
+    c = p.z.square()
+    d = c.mul_by_element(3)
+    e = d.mul_by_b_twist_coeff()
+    f = e.mul_by_element(3)
+    g = b.add(f).halve()
+    h = p.y.add(p.z).square().sub(b).sub(c)
+    i = e.sub(b)
+    j = p.x.square()
+    ee = e.square()
+    k = ee.mul_by_element(3)
+
+    x = b.sub(f).mul(a)
+    y = g.square().sub(k)
+    z = b.mul(h)
+
+    line = LineEvaluation(
+        r0=h.neg(),
+        r1=j.mul_by_element(3),
+        r2=i,
+    )
+    return G2Proj(x, y, z), line, G2DoubleStepWitness(a, b, c, ee)
+
+
+def add_mixed_step_with_witness(p: G2Proj, a: G2Affine) -> Tuple[G2Proj, LineEvaluation, G2AddStepWitness]:
+    y2z1 = a.y.mul(p.z)
+    o = p.y.sub(y2z1)
+    x2z1 = a.x.mul(p.z)
+    l = p.x.sub(x2z1)
+    c = o.square()
+    d = l.square()
+    e = l.mul(d)
+    f = p.z.mul(c)
+    g = p.x.mul(d)
+    t0 = g.double()
+    h = e.add(f).sub(t0)
+    t1 = p.y.mul(e)
+
+    x = l.mul(h)
+    y = g.sub(h).mul(o).sub(t1)
+    z = e.mul(p.z)
+
+    t2 = l.mul(a.y)
+    j = a.x.mul(o).sub(t2)
+    line = LineEvaluation(r0=l, r1=o.neg(), r2=j)
+
+    witness = G2AddStepWitness(c, d, e, f, g, t1, t2)
+    return G2Proj(x, y, z), line, witness
+
+
+def line_compute_with_witness(p: G2Proj, a: G2Affine) -> Tuple[LineEvaluation, G2LineComputeWitness]:
+    y2z1 = a.y.mul(p.z)
+    o = p.y.sub(y2z1)
+    x2z1 = a.x.mul(p.z)
+    l = p.x.sub(x2z1)
+    t2 = l.mul(a.y)
+    j = a.x.mul(o).sub(t2)
+    line = LineEvaluation(r0=l, r1=o.neg(), r2=j)
+    return line, G2LineComputeWitness(t2)
+
+
+def compute_line_schedule_raw(q: G2Affine) -> LineScheduleRaw:
+    q_proj = projective_from_affine_g2(q)
+    q_neg = q.neg()
+    digits = loop_counter()
+
+    loop_doubles: List[LineEvaluation] = []
+    loop_adds_pos: List[LineEvaluation] = []
+    loop_adds_neg: List[LineEvaluation] = []
+
+    q_proj, line = q_proj.double_step()
+    initial_double = line
+
+    _, line = q_proj.line_compute(q_neg)
+    pre_loop_line = line
+
+    q_proj, line = q_proj.add_mixed_step(q)
+    pre_loop_add = line
+
+    for idx in range(63):
+        i = 62 - idx
+        q_proj, line = q_proj.double_step()
+        loop_doubles.append(line)
+
+        digit = digits[i]
+        if digit == 1:
+            q_proj, line_add = q_proj.add_mixed_step(q)
+            loop_adds_pos.append(line_add)
+            loop_adds_neg.append(zero_line())
+        elif digit == -1:
+            q_proj, line_add = q_proj.add_mixed_step(q_neg)
+            loop_adds_pos.append(zero_line())
+            loop_adds_neg.append(line_add)
+        else:
+            loop_adds_pos.append(zero_line())
+            loop_adds_neg.append(zero_line())
+
+    q1 = frobenius_g2(q)
+    q2 = frobenius_square_g2(q)
+    q_proj, line = q_proj.add_mixed_step(q1)
+    final_add = line
+
+    _, line = q_proj.line_compute(q2)
+    final_line = line
+
+    return LineScheduleRaw(
+        initial_double=initial_double,
+        pre_loop_line=pre_loop_line,
+        pre_loop_add=pre_loop_add,
+        loop_doubles=loop_doubles,
+        loop_adds_pos=loop_adds_pos,
+        loop_adds_neg=loop_adds_neg,
+        final_add=final_add,
+        final_line=final_line,
+    )
+
+
+def evaluate_schedule_at_p(raw: LineScheduleRaw, p: G1Affine) -> LineScheduleRaw:
+    return LineScheduleRaw(
+        initial_double=line_eval_at_point(raw.initial_double, p),
+        pre_loop_line=line_eval_at_point(raw.pre_loop_line, p),
+        pre_loop_add=line_eval_at_point(raw.pre_loop_add, p),
+        loop_doubles=[line_eval_at_point(line, p) for line in raw.loop_doubles],
+        loop_adds_pos=[line_eval_at_point(line, p) for line in raw.loop_adds_pos],
+        loop_adds_neg=[line_eval_at_point(line, p) for line in raw.loop_adds_neg],
+        final_add=line_eval_at_point(raw.final_add, p),
+        final_line=line_eval_at_point(raw.final_line, p),
+    )
+
+
+def compute_b_schedule_with_witness(p: G1Affine, q: G2Affine) -> Tuple[LineScheduleRaw, LineScheduleRaw, G2LineWitness]:
+    q_proj = projective_from_affine_g2(q)
+    q_neg = q.neg()
+    digits = loop_counter()
+
+    loop_doubles: List[LineEvaluation] = []
+    loop_adds_pos: List[LineEvaluation] = []
+    loop_adds_neg: List[LineEvaluation] = []
+
+    loop_add_wit_pos: List[G2AddStepWitness] = []
+    loop_add_wit_neg: List[G2AddStepWitness] = []
+    loop_add_outputs: List[G2Proj] = []
+
+    double_witnesses: List[G2DoubleStepWitness] = []
+    double_outputs: List[G2Proj] = []
+
+    q_proj, line, double_wit = double_step_with_witness(q_proj)
+    initial_double = line
+    initial_double_eval = line_eval_at_point(line, p)
+    double_witnesses.append(double_wit)
+    double_outputs.append(q_proj)
+
+    line, pre_loop_line_wit = line_compute_with_witness(q_proj, q_neg)
+    pre_loop_line = line
+    pre_loop_line_eval = line_eval_at_point(line, p)
+
+    q_proj, line, pre_loop_add_wit = add_mixed_step_with_witness(q_proj, q)
+    pre_loop_add = line
+    pre_loop_add_eval = line_eval_at_point(line, p)
+    pre_loop_add_output = q_proj
+
+    for idx in range(63):
+        i = 62 - idx
+        q_proj, line, double_wit = double_step_with_witness(q_proj)
+        loop_doubles.append(line)
+        double_witnesses.append(double_wit)
+        double_outputs.append(q_proj)
+
+        digit = digits[i]
+        if digit == 1:
+            q_proj, line_add, add_wit = add_mixed_step_with_witness(q_proj, q)
+            loop_adds_pos.append(line_add)
+            loop_adds_neg.append(zero_line())
+            loop_add_wit_pos.append(add_wit)
+            loop_add_wit_neg.append(zero_add_witness())
+            loop_add_outputs.append(q_proj)
+        elif digit == -1:
+            q_proj, line_add, add_wit = add_mixed_step_with_witness(q_proj, q_neg)
+            loop_adds_pos.append(zero_line())
+            loop_adds_neg.append(line_add)
+            loop_add_wit_pos.append(zero_add_witness())
+            loop_add_wit_neg.append(add_wit)
+            loop_add_outputs.append(q_proj)
+        else:
+            loop_adds_pos.append(zero_line())
+            loop_adds_neg.append(zero_line())
+            loop_add_wit_pos.append(zero_add_witness())
+            loop_add_wit_neg.append(zero_add_witness())
+            loop_add_outputs.append(q_proj)
+
+    q1 = frobenius_g2(q)
+    q2 = frobenius_square_g2(q)
+    q_proj, line, final_add_wit = add_mixed_step_with_witness(q_proj, q1)
+    final_add = line
+    final_add_eval = line_eval_at_point(line, p)
+    final_add_output = q_proj
+
+    line, final_line_wit = line_compute_with_witness(q_proj, q2)
+    final_line = line
+    final_line_eval = line_eval_at_point(line, p)
+
+    raw = LineScheduleRaw(
+        initial_double=initial_double,
+        pre_loop_line=pre_loop_line,
+        pre_loop_add=pre_loop_add,
+        loop_doubles=loop_doubles,
+        loop_adds_pos=loop_adds_pos,
+        loop_adds_neg=loop_adds_neg,
+        final_add=final_add,
+        final_line=final_line,
+    )
+    eval_schedule = LineScheduleRaw(
+        initial_double=initial_double_eval,
+        pre_loop_line=pre_loop_line_eval,
+        pre_loop_add=pre_loop_add_eval,
+        loop_doubles=[line_eval_at_point(line, p) for line in loop_doubles],
+        loop_adds_pos=[line_eval_at_point(line, p) for line in loop_adds_pos],
+        loop_adds_neg=[line_eval_at_point(line, p) for line in loop_adds_neg],
+        final_add=final_add_eval,
+        final_line=final_line_eval,
+    )
+
+    witness = G2LineWitness(
+        double_witnesses=double_witnesses,
+        double_outputs=double_outputs,
+        pre_loop_line_witness=pre_loop_line_wit,
+        pre_loop_add_witness=pre_loop_add_wit,
+        pre_loop_add_output=pre_loop_add_output,
+        loop_add_witness_pos=loop_add_wit_pos,
+        loop_add_witness_neg=loop_add_wit_neg,
+        loop_add_outputs=loop_add_outputs,
+        final_add_witness=final_add_wit,
+        final_add_output=final_add_output,
+        final_line_witness=final_line_wit,
+    )
+
+    return raw, eval_schedule, witness
 
 
 def loop_counter() -> List[int]:
@@ -934,6 +1590,93 @@ def fp12_to_coeffs(z: Fp12) -> List[int]:
     ]
 
 
+def fp12_sample_hex(z: Fp12, count: int = 2) -> List[str]:
+    coeffs = fp12_to_coeffs(z)
+    return [hex(c) for c in coeffs[:count]]
+
+
+def derive_rho_sp1_from_limbs(input0: int, input1: int, limb_sets: List[Tuple[int, int, int]]) -> int:
+    data = bytearray(448)
+    offset = 0
+
+    data[offset:offset + 32] = input0.to_bytes(32, "little")
+    offset += 32
+    data[offset:offset + 32] = input1.to_bytes(32, "little")
+    offset += 32
+
+    for limbs in limb_sets:
+        for limb in limbs:
+            data[offset:offset + 16] = limb.to_bytes(16, "little")
+            offset += 16
+
+    digest = hashlib.sha256(data).digest()
+    return int.from_bytes(digest, "big") % P
+
+
+def miller_loop_with_lines_sp1_eval(
+    eval_b: "LineScheduleRaw",
+    eval_delta: "LineScheduleRaw",
+    eval_gamma: "LineScheduleRaw",
+) -> Fp12:
+    schedules = [eval_b, eval_delta, eval_gamma]
+    result = Fp12.one()
+
+    line0 = schedules[0].initial_double
+    result = Fp12(
+        Fp6(line0.r0, fp2_zero(), fp2_zero()),
+        Fp6(line0.r1, line0.r2, fp2_zero()),
+    )
+
+    line1 = schedules[1].initial_double
+    prod_lines = mul_034_by_034(
+        line1.r0,
+        line1.r1,
+        line1.r2,
+        result.c0.b0,
+        result.c1.b0,
+        result.c1.b1,
+    )
+    result = Fp12(
+        Fp6(prod_lines[0], prod_lines[1], prod_lines[2]),
+        Fp6(prod_lines[3], prod_lines[4], fp2_zero()),
+    )
+
+    line2 = schedules[2].initial_double
+    result = result.mul_by_034(line2.r0, line2.r1, line2.r2)
+
+    result = result.square()
+    for k in range(3):
+        l2 = schedules[k].pre_loop_line
+        l1 = schedules[k].pre_loop_add
+        prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2)
+        result = result.mul_by_01234(prod_lines)
+
+    digits = loop_counter()
+    for idx in range(63):
+        digit = digits[62 - idx]
+        result = result.square()
+        for k in range(3):
+            l1 = schedules[k].loop_doubles[idx]
+            if digit == 1:
+                l2 = schedules[k].loop_adds_pos[idx]
+                prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2)
+                result = result.mul_by_01234(prod_lines)
+            elif digit == -1:
+                l2 = schedules[k].loop_adds_neg[idx]
+                prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2)
+                result = result.mul_by_01234(prod_lines)
+            else:
+                result = result.mul_by_034(l1.r0, l1.r1, l1.r2)
+
+    for k in range(3):
+        l2 = schedules[k].final_add
+        l1 = schedules[k].final_line
+        prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2)
+        result = result.mul_by_01234(prod_lines)
+
+    return result
+
+
 def gt_pow(x: Fp12, exponent: int) -> Fp12:
     result = Fp12.one()
     base = x
@@ -1114,6 +1857,121 @@ def fp12_to_limb_list(z: Fp12) -> List[List[str]]:
     return [limbs_as_strings(fp_to_limbs(coeff)) for coeff in fp12_to_coeffs(z)]
 
 
+def fp2_to_limb_list(z: Fp2) -> List[List[str]]:
+    return [limbs_as_strings(fp_to_limbs(z.c0)), limbs_as_strings(fp_to_limbs(z.c1))]
+
+
+def line_to_limb_list(line: LineEvaluation) -> List[List[List[str]]]:
+    return [fp2_to_limb_list(line.r0), fp2_to_limb_list(line.r1), fp2_to_limb_list(line.r2)]
+
+
+def g2_proj_to_limb_list(p: G2Proj) -> List[List[List[str]]]:
+    return [fp2_to_limb_list(p.x), fp2_to_limb_list(p.y), fp2_to_limb_list(p.z)]
+
+
+def double_witness_to_limb_list(w: G2DoubleStepWitness) -> List[List[List[str]]]:
+    return [fp2_to_limb_list(w.a), fp2_to_limb_list(w.b), fp2_to_limb_list(w.c), fp2_to_limb_list(w.ee)]
+
+
+def add_witness_to_limb_list(w: G2AddStepWitness) -> List[List[List[str]]]:
+    return [
+        fp2_to_limb_list(w.c),
+        fp2_to_limb_list(w.d),
+        fp2_to_limb_list(w.e),
+        fp2_to_limb_list(w.f),
+        fp2_to_limb_list(w.g),
+        fp2_to_limb_list(w.t1),
+        fp2_to_limb_list(w.t2),
+    ]
+
+
+def line_compute_witness_to_limb_list(w: G2LineComputeWitness) -> List[List[List[str]]]:
+    return [fp2_to_limb_list(w.t2)]
+
+
+def schedule_raw_to_payload(raw: LineScheduleRaw) -> dict:
+    return {
+        "initial_double": line_to_limb_list(raw.initial_double),
+        "pre_loop_line": line_to_limb_list(raw.pre_loop_line),
+        "pre_loop_add": line_to_limb_list(raw.pre_loop_add),
+        "loop_doubles": [line_to_limb_list(line) for line in raw.loop_doubles],
+        "loop_adds_pos": [line_to_limb_list(line) for line in raw.loop_adds_pos],
+        "loop_adds_neg": [line_to_limb_list(line) for line in raw.loop_adds_neg],
+        "final_add": line_to_limb_list(raw.final_add),
+        "final_line": line_to_limb_list(raw.final_line),
+    }
+
+
+def line_witness_to_payload(w: G2LineWitness) -> dict:
+    return {
+        "double_witnesses": [double_witness_to_limb_list(dw) for dw in w.double_witnesses],
+        "double_outputs": [g2_proj_to_limb_list(p) for p in w.double_outputs],
+        "pre_loop_line_witness": line_compute_witness_to_limb_list(w.pre_loop_line_witness),
+        "pre_loop_add_witness": add_witness_to_limb_list(w.pre_loop_add_witness),
+        "pre_loop_add_output": g2_proj_to_limb_list(w.pre_loop_add_output),
+        "loop_add_witness_pos": [add_witness_to_limb_list(aw) for aw in w.loop_add_witness_pos],
+        "loop_add_witness_neg": [add_witness_to_limb_list(aw) for aw in w.loop_add_witness_neg],
+        "loop_add_outputs": [g2_proj_to_limb_list(p) for p in w.loop_add_outputs],
+        "final_add_witness": add_witness_to_limb_list(w.final_add_witness),
+        "final_add_output": g2_proj_to_limb_list(w.final_add_output),
+        "final_line_witness": line_compute_witness_to_limb_list(w.final_line_witness),
+    }
+
+
+def combine_eval_schedules(eval_b: LineScheduleRaw, eval_delta: LineScheduleRaw, eval_gamma: LineScheduleRaw) -> dict:
+    return {
+        "initial_doubles": [
+            line_to_limb_list(eval_b.initial_double),
+            line_to_limb_list(eval_delta.initial_double),
+            line_to_limb_list(eval_gamma.initial_double),
+        ],
+        "pre_loop_lines": [
+            line_to_limb_list(eval_b.pre_loop_line),
+            line_to_limb_list(eval_delta.pre_loop_line),
+            line_to_limb_list(eval_gamma.pre_loop_line),
+        ],
+        "pre_loop_adds": [
+            line_to_limb_list(eval_b.pre_loop_add),
+            line_to_limb_list(eval_delta.pre_loop_add),
+            line_to_limb_list(eval_gamma.pre_loop_add),
+        ],
+        "loop_doubles": [
+            [
+                line_to_limb_list(eval_b.loop_doubles[i]),
+                line_to_limb_list(eval_delta.loop_doubles[i]),
+                line_to_limb_list(eval_gamma.loop_doubles[i]),
+            ]
+            for i in range(63)
+        ],
+        "loop_adds_pos": [
+            [
+                line_to_limb_list(eval_b.loop_adds_pos[i]),
+                line_to_limb_list(eval_delta.loop_adds_pos[i]),
+                line_to_limb_list(eval_gamma.loop_adds_pos[i]),
+            ]
+            for i in range(63)
+        ],
+        "loop_adds_neg": [
+            [
+                line_to_limb_list(eval_b.loop_adds_neg[i]),
+                line_to_limb_list(eval_delta.loop_adds_neg[i]),
+                line_to_limb_list(eval_gamma.loop_adds_neg[i]),
+            ]
+            for i in range(63)
+        ],
+        "final_adds": [
+            line_to_limb_list(eval_b.final_add),
+            line_to_limb_list(eval_delta.final_add),
+            line_to_limb_list(eval_gamma.final_add),
+        ],
+        "final_lines": [
+            line_to_limb_list(eval_b.final_line),
+            line_to_limb_list(eval_delta.final_line),
+            line_to_limb_list(eval_gamma.final_line),
+        ],
+    }
+
+
 def emit_fp12_noir(z: Fp12) -> str:
     coeffs = fp12_to_coeffs(z)
     fp2s = [
@@ -1137,12 +1995,83 @@ def emit_fp12_noir(z: Fp12) -> str:
     return "\n".join(lines)
 
 
+def fp2_to_noir(fp2: Fp2) -> str:
+    l0, l1, l2 = fp_to_limbs(fp2.c0)
+    r0, r1, r2 = fp_to_limbs(fp2.c1)
+    return f"fp2_from_limbs([{hex(l0)}, {hex(l1)}, {hex(l2)}], [{hex(r0)}, {hex(r1)}, {hex(r2)}])"
+
+
+def line_eval_to_noir(line: LineEvaluation, indent: str) -> str:
+    r0 = fp2_to_noir(line.r0)
+    r1 = fp2_to_noir(line.r1)
+    r2 = fp2_to_noir(line.r2)
+    return (
+        f"{indent}LineEvaluation {{\n"
+        f"{indent}    r0: {r0},\n"
+        f"{indent}    r1: {r1},\n"
+        f"{indent}    r2: {r2},\n"
+        f"{indent}}}"
+    )
+
+
+def emit_line_schedule_noir(name: str, schedule: LineScheduleRaw) -> str:
+    indent = "    "
+    lines = [f"pub fn {name}() -> LineScheduleRaw {{"]
+    lines.append(f"{indent}LineScheduleRaw {{")
+    lines.append(f"{indent}    initial_double: {line_eval_to_noir(schedule.initial_double, indent + '    ')},")
+    lines.append(f"{indent}    pre_loop_line: {line_eval_to_noir(schedule.pre_loop_line, indent + '    ')},")
+    lines.append(f"{indent}    pre_loop_add: {line_eval_to_noir(schedule.pre_loop_add, indent + '    ')},")
+    lines.append(f"{indent}    loop_doubles: [")
+    for line in schedule.loop_doubles:
+        lines.append(f"{indent}        {line_eval_to_noir(line, indent + '        ')},")
+    lines.append(f"{indent}    ],")
+    lines.append(f"{indent}    loop_adds_pos: [")
+    for line in schedule.loop_adds_pos:
+        lines.append(f"{indent}        {line_eval_to_noir(line, indent + '        ')},")
+    lines.append(f"{indent}    ],")
+    lines.append(f"{indent}    loop_adds_neg: [")
+    for line in schedule.loop_adds_neg:
+        lines.append(f"{indent}        {line_eval_to_noir(line, indent + '        ')},")
+    lines.append(f"{indent}    ],")
+    lines.append(f"{indent}    final_add: {line_eval_to_noir(schedule.final_add, indent + '    ')},")
+    lines.append(f"{indent}    final_line: {line_eval_to_noir(schedule.final_line, indent + '    ')},")
+    lines.append(f"{indent}}}")
+    lines.append("}")
+    return "\n".join(lines)
+
+
+def emit_fixed_lines_file(delta_raw: LineScheduleRaw, gamma_raw: LineScheduleRaw) -> str:
+    header = [
+        "use noir_bn254_pairing::fp::Fp;",
+        "use noir_bn254_pairing::fp2::Fp2;",
+        "use noir_bn254_pairing::g2::{LineEvaluation, LineScheduleRaw};",
+        "use noir_bn254_pairing::BigNum;",
+        "",
+        "fn fp_from_limbs(l0: u128, l1: u128, l2: u128) -> Fp {",
+        "    Fp::from_limbs([l0, l1, l2])",
+        "}",
+        "",
+        "fn fp2_from_limbs(a0: [u128; 3], a1: [u128; 3]) -> Fp2 {",
+        "    Fp2 { c0: fp_from_limbs(a0[0], a0[1], a0[2]), c1: fp_from_limbs(a1[0], a1[1], a1[2]) }",
+        "}",
+        "",
+    ]
+    body = [
+        emit_line_schedule_noir("sp1_delta_lines", delta_raw),
+        "",
+        emit_line_schedule_noir("sp1_gamma_lines", gamma_raw),
+        "",
+    ]
+    return "\n".join(header + body)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="SP1 PairingCheck witness generator")
     parser.add_argument("--proof-json", help="SP1 proof JSON (proof/publicValues/vkey)")
     parser.add_argument("--format", choices=["json", "toml"], default="json")
     parser.add_argument("--no-validate", action="store_true")
     parser.add_argument("--print-t-preimage", action="store_true")
+    parser.add_argument("--emit-fixed-lines", help="Write fixed line constants noir file")
     parser.add_argument("--output", help="Write output to file")
     args = parser.parse_args()
 
@@ -1161,6 +2090,14 @@ def main() -> None:
         vkey = int.from_bytes(bytes.fromhex(data["vkey"][2:] if data["vkey"].startswith("0x") else data["vkey"]), "big")
         input0, input1 = compute_sp1_public_inputs(vkey, public_values)
         c_wit, w_wit = compute_witness(a, b, c, input0, input1)
+        l = compute_linear_combination(input0, input1)
+
+        b_raw, b_eval, b_witness = compute_b_schedule_with_witness(a, b)
+        delta_raw = compute_line_schedule_raw(SP1_DELTA_NEG)
+        gamma_raw = compute_line_schedule_raw(SP1_GAMMA_NEG)
+        delta_eval = evaluate_schedule_at_p(delta_raw, c)
+        gamma_eval = evaluate_schedule_at_p(gamma_raw, l)
+        lines_payload = combine_eval_schedules(b_eval, delta_eval, gamma_eval)
 
         if not args.no_validate:
             f = miller_loop([a, c, compute_linear_combination(input0, input1)], [b, SP1_DELTA_NEG, SP1_GAMMA_NEG])
@@ -1175,6 +2112,9 @@ def main() -> None:
         payload = {
             "c": fp12_to_limb_list(c_wit),
             "w": fp12_to_limb_list(w_wit),
+            "lines": lines_payload,
+            "b_lines_raw": schedule_raw_to_payload(b_raw),
+            "b_line_witness": line_witness_to_payload(b_witness),
         }
 
         if args.format == "json":
@@ -1189,6 +2129,11 @@ def main() -> None:
                 lines.append(f'  ["{row[0]}", "{row[1]}", "{row[2]}"],')
             lines.append("]")
             outputs.append("\n".join(lines))
+
+        if args.emit_fixed_lines:
+            fixed_content = emit_fixed_lines_file(delta_raw, gamma_raw)
+            with open(args.emit_fixed_lines, "w", encoding="utf-8") as f:
+                f.write(fixed_content)
 
     if not outputs:
         parser.error("no action requested")
