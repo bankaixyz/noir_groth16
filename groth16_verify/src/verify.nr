@@ -1,6 +1,5 @@
-use crate::config::sp1::{sp1_msm2_w3_table, sp1_vk};
 use crate::types::{Proof, VerifyingKey};
-use noir_bn254_pairing::fp::{fp_one};
+use noir_bn254_pairing::fp::{Fp, fp_one};
 use noir_bn254_pairing::fp2::Fp2;
 use noir_bn254_pairing::fp12::Fp12;
 use noir_bn254_pairing::g1::{
@@ -14,8 +13,14 @@ use noir_bn254_pairing::g1::{
     is_on_curve_g1_affine,
     jacobian_to_affine_g1,
 };
-use noir_bn254_pairing::g2::{is_in_correct_subgroup_g2, is_on_curve_g2_affine};
-use noir_bn254_pairing::pairing::pairing_multi;
+use noir_bn254_pairing::g2::{
+    G2LineWitness,
+    LineSchedule,
+    LineScheduleRaw,
+    is_in_correct_subgroup_g2,
+    is_on_curve_g2_affine,
+};
+use noir_bn254_pairing::{pairing_check_optimized, pairing_multi};
 
 /// Convert G1 affine to Jacobian without inversion.
 fn g1_affine_to_jac(p: G1Affine) -> G1Jac {
@@ -180,19 +185,24 @@ pub fn verify<let N: u32, let L: u32>(
     fp12_eq(result, vk.alpha_beta)
 }
 
-/// Fast path for SP1 proofs with two public inputs and embedded constants.
-pub fn verify_sp1_fast(proof: Proof, public_inputs: [Field; 2]) -> bool {
-    let vk = sp1_vk();
-    let msm2_w3_table = sp1_msm2_w3_table();
-    verify_sp1_fast_with_table(vk, proof, public_inputs, msm2_w3_table)
-}
-
-/// Fast path with caller-supplied table and VK (must be trusted constants).
-pub fn verify_sp1_fast_with_table(
+/// Optimized Groth16 verification for two public inputs.
+///
+/// Uses a joint-window MSM table, a witnessed line schedule, and a pairing
+/// preimage check. The caller must supply trusted constants and line data.
+pub fn verify_optimized(
     vk: VerifyingKey<3>,
     proof: Proof,
     public_inputs: [Field; 2],
     msm2_w3_table: [G1Affine; 64],
+    t_preimage: Fp12,
+    delta_lines: LineScheduleRaw,
+    gamma_lines: LineScheduleRaw,
+    lines: LineSchedule,
+    b_lines_raw: LineScheduleRaw,
+    b_line_witness: G2LineWitness,
+    rho: Fp,
+    c: Fp12,
+    w: Fp12,
 ) -> bool {
     assert(is_on_curve_g1_affine(proof.a));
     assert(is_on_curve_g1_affine(proof.c));
@@ -201,14 +211,22 @@ pub fn verify_sp1_fast_with_table(
     assert(!proof.b.is_infinity());
     assert(!proof.c.is_infinity());
     assert(is_in_correct_subgroup_g2(proof.b));
+
     let msm = msm2_window3_g1_jac(msm2_w3_table, public_inputs[0], public_inputs[1]);
     let acc = add_g1_jac_mixed(msm, vk.ic[0]);
     let l = jacobian_to_affine_g1(acc);
 
-    let result = pairing_multi(
+    pairing_check_optimized(
         [proof.a, proof.c, l],
         [proof.b, vk.delta_neg, vk.gamma_neg],
-    );
-
-    fp12_eq(result, vk.alpha_beta)
+        t_preimage,
+        delta_lines,
+        gamma_lines,
+        lines,
+        b_lines_raw,
+        b_line_witness,
+        rho,
+        c,
+        w,
+    )
 }

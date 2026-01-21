@@ -3,7 +3,10 @@ use crate::fp2::Fp2;
 use crate::fp6::Fp6;
 use crate::fp12::Fp12;
 use crate::g1::G1Affine;
-use crate::g2::G2Affine;
+use crate::g2::{
+    G2Affine,
+    LineEvaluation,
+};
 use crate::pairing::{miller_loop, pairing, pairing_multi};
 use bignum::BigNum;
 
@@ -38,6 +41,7 @@ fn fp12_eq(a: Fp12, b: Fp12) -> bool {
     let c5 = fp2_eq(a.c1.b2, b.c1.b2);
     c0 & c1 & c2 & c3 & c4 & c5
 }
+
 
 fn g1_vector_single_generators() -> G1Affine {
     G1Affine { x: fp_from_limbs(0x1, 0x0, 0x0), y: fp_from_limbs(0x2, 0x0, 0x0) }
@@ -306,3 +310,4 @@ fn pairing_multi_2_pairs_vectors_matches() {
     let expected = expected_pairing_multi_2_pairs();
     assert(fp12_eq(result, expected));
 }
+

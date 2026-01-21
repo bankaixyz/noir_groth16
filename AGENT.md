@@ -45,15 +45,15 @@ nargo execute
 
 Pairing library:
 
-- `bn254_pairing/src/pairing.nr`: `pairing`, `pairing_multi`, `miller_loop`, `final_exponentiation`
+- `bn254_pairing/src/pairing.nr`: `pairing`, `pairing_multi`, `pairing_check_optimized`
 - `bn254_pairing/src/g1.nr`: G1 ops
 - `bn254_pairing/src/g2.nr`: G2 ops + line evaluations used by Miller loop
 - `bn254_pairing/src/fp*.nr`: field towers (`Fp`, `Fp2`, `Fp6`, `Fp12`)
 
 Groth16 verifier:
 
-- `groth16_verify/src/verify.nr`: generic `verify` and `verify_sp1_fast`
-- `groth16_verify/src/sp1.nr`: `verify_sp1` and SP1 public input hashing
+- `groth16_verify/src/verify.nr`: generic `verify` and `verify_optimized`
+- `groth16_verify/src/sp1.nr`: SP1 `verify` + `verify_optimized`, plus public input hashing
 - `groth16_verify/src/config/sp1.nr`: embedded SP1 verifying key + precomputed MSM table
 - `groth16_verify/SP1_NOIR_SPEC.md`: reference notes + constants format
 
