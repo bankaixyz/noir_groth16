@@ -2,8 +2,8 @@ use noir_bn254_pairing::fp::fp_from_limbs_checked;
 use noir_bn254_pairing::fp2::Fp2;
 use noir_bn254_pairing::fp6::Fp6;
 use noir_bn254_pairing::fp12::Fp12;
-use noir_bn254_pairing::g2::{G2LineWitnessSp1, LineScheduleSp1, LineScheduleSp1Raw};
-use noir_groth16_verify::sp1::{sp1_public_inputs, verify_sp1_pairing_check_with_lines};
+use noir_bn254_pairing::g2::{G2LineWitness, LineSchedule, LineScheduleRaw};
+use noir_groth16_verify::sp1::{sp1_public_inputs, verify_optimized};
 
 pub fn main(
     a_x: [u128; 3],
@@ -18,13 +18,13 @@ pub fn main(
     public_values: [u8; 32],
     c: [[u128; 3]; 12],
     w: [[u128; 3]; 12],
-    lines: LineScheduleSp1,
-    b_lines_raw: LineScheduleSp1Raw,
-    b_line_witness: G2LineWitnessSp1,
+    lines: LineSchedule,
+    b_lines_raw: LineScheduleRaw,
+    b_line_witness: G2LineWitness,
 ) -> pub [Field; 2] {
     let c_fp12 = fp12_from_coeffs(c);
     let w_fp12 = fp12_from_coeffs(w);
-    let verified = verify_sp1_pairing_check_with_lines(
+    let verified = verify_optimized(
         vkey,
         public_values,
         a_x,

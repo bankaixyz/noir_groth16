@@ -35,8 +35,8 @@ pub struct LineEvalAtP {
     pub r2: Fp2,
 }
 
-/// Line schedule for SP1's fixed 3-pair Miller loop (evaluated at P).
-pub struct LineScheduleSp1 {
+/// Line schedule for a fixed 3-pair Miller loop (evaluated at P).
+pub struct LineSchedule {
     pub initial_doubles: [LineEvalAtP; 3],
     pub pre_loop_lines: [LineEvalAtP; 3],
     pub pre_loop_adds: [LineEvalAtP; 3],
@@ -48,7 +48,7 @@ pub struct LineScheduleSp1 {
 }
 
 /// Raw line schedule for a single G2 point (un-evaluated coefficients).
-pub struct LineScheduleSp1Raw {
+pub struct LineScheduleRaw {
     pub initial_double: LineEvaluation,
     pub pre_loop_line: LineEvaluation,
     pub pre_loop_add: LineEvaluation,
@@ -80,8 +80,8 @@ pub struct G2LineComputeWitness {
     pub t2: Fp2,
 }
 
-/// Projective-state and intermediate witnesses for SP1 line checks on B.
-pub struct G2LineWitnessSp1 {
+/// Projective-state and intermediate witnesses for line checks on the variable G2 point.
+pub struct G2LineWitness {
     pub double_witnesses: [G2DoubleStepWitness; 64],
     pub double_outputs: [G2Proj; 64],
     pub pre_loop_line_witness: G2LineComputeWitness,

@@ -2,8 +2,8 @@
 
 This repo contains two Noir libraries:
 
-- `noir_bn254_pairing`: BN254 pairing, final exponentiation, and curve ops.
-- `noir_groth16_verify`: Groth16 verification on BN254, plus an SP1-optimized path.
+- `noir_bn254_pairing`: BN254 pairing, optimized pairing checks, and curve ops.
+- `noir_groth16_verify`: Groth16 verification on BN254, with an optimized path and SP1 wrapper.
 
 ## Cryptography summary
 
@@ -19,8 +19,17 @@ This repo contains two Noir libraries:
   e(A, B) * e(C, -delta) * e(L, -gamma) = e(alpha, beta).
 - **Proof validation**: verifier enforces on-curve checks, rejects infinity points,
   and checks G2 subgroup membership for proof points.
-- **SP1 fast path**: 2-scalar MSM with a 3-bit joint window (Straus/Shamir),
-  using embedded constants; use `verify_sp1_fast_with_table` only with trusted tables.
+- **Optimized verification**: 2-scalar MSM with a 3-bit joint window (Straus/Shamir),
+  pre-evaluated line schedules, and a pairing preimage check.
+
+## Core optimizations
+
+- **Signed-NAF Miller loop**: fewer additions for optimal Ate pairing.
+- **Sparse line arithmetic**: `mul_by_034`, `mul_034_by_034`, `mul_by_01234` avoid full Fp12 multiplies.
+- **Mixed G2 additions**: keeps line evaluations cheap and avoids affine inversions.
+- **Pre-evaluated line schedules**: skip in-circuit G2 arithmetic for fixed/known pairs.
+- **Joint-window MSM table**: precompute `a*ic1 + b*ic2` for 3-bit digits (two-scalar MSM).
+- **Preimage pairing check**: uses `(t_preimage, c, w)` to avoid a full final exponentiation.
 
 Tests are slow; the fastest sanity check is in the Groth16 verifier.
 
@@ -74,7 +83,7 @@ Single pairing:
 ```noir
 use noir_bn254_pairing::g1::G1Affine;
 use noir_bn254_pairing::g2::G2Affine;
-use noir_bn254_pairing::pairing::pairing;
+use noir_bn254_pairing::pairing;
 
 fn verify_pairing(p: G1Affine, q: G2Affine) -> Field {
     let f = pairing(p, q);
@@ -88,7 +97,7 @@ Multi pairing (checks multiple pairs in one Miller loop):
 ```noir
 use noir_bn254_pairing::g1::G1Affine;
 use noir_bn254_pairing::g2::G2Affine;
-use noir_bn254_pairing::pairing::pairing_multi;
+use noir_bn254_pairing::pairing_multi;
 
 fn multi_pairing(p: [G1Affine; 2], q: [G2Affine; 2]) -> Field {
     let f = pairing_multi(p, q);
@@ -113,10 +122,13 @@ fn check<const N: u32, const L: u32>(
 }
 ```
 
+For the optimized verifier, call `verify_optimized` with a joint-window MSM table,
+preimage data, and a witnessed line schedule (see `sp1_verify_example`).
+
 SP1 verifier (two public inputs: vkey and hash(public values)):
 
 ```noir
-use noir_groth16_verify::sp1::verify_sp1;
+use noir_groth16_verify::sp1::verify;
 use noir_groth16_verify::types::Proof;
 
 fn check_sp1<const N: u32>(
@@ -124,11 +136,11 @@ fn check_sp1<const N: u32>(
     public_values: [u8; N],
     proof: Proof,
 ) -> bool {
-    verify_sp1::<N>(vkey, public_values, proof)
+    verify::<N>(vkey, public_values, proof)
 }
 ```
 
-For custom SP1 verifying keys and MSM tables, use `verify_sp1_fast_with_table` and
-ensure the table/VK are constants in the circuit.
+The optimized verifier requires line schedules, witness data, and SP1 constants.
+See `sp1_verify_example` for a full end-to-end usage.
 
 Example circuits live in `pairing_multi_example` and `sp1_verify_example`.

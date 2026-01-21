@@ -2016,8 +2016,8 @@ def line_eval_to_noir(line: LineEvaluation, indent: str) -> str:
 
 def emit_line_schedule_noir(name: str, schedule: LineScheduleRaw) -> str:
     indent = "    "
-    lines = [f"pub fn {name}() -> LineScheduleSp1Raw {{"]
-    lines.append(f"{indent}LineScheduleSp1Raw {{")
+    lines = [f"pub fn {name}() -> LineScheduleRaw {{"]
+    lines.append(f"{indent}LineScheduleRaw {{")
     lines.append(f"{indent}    initial_double: {line_eval_to_noir(schedule.initial_double, indent + '    ')},")
     lines.append(f"{indent}    pre_loop_line: {line_eval_to_noir(schedule.pre_loop_line, indent + '    ')},")
     lines.append(f"{indent}    pre_loop_add: {line_eval_to_noir(schedule.pre_loop_add, indent + '    ')},")
@@ -2044,7 +2044,7 @@ def emit_fixed_lines_file(delta_raw: LineScheduleRaw, gamma_raw: LineScheduleRaw
     header = [
         "use noir_bn254_pairing::fp::Fp;",
         "use noir_bn254_pairing::fp2::Fp2;",
-        "use noir_bn254_pairing::g2::{LineEvaluation, LineScheduleSp1Raw};",
+        "use noir_bn254_pairing::g2::{LineEvaluation, LineScheduleRaw};",
         "use noir_bn254_pairing::BigNum;",
         "",
         "fn fp_from_limbs(l0: u128, l1: u128, l2: u128) -> Fp {",

@@ -1,6 +1,6 @@
 use noir_bn254_pairing::fp::Fp;
 use noir_bn254_pairing::fp2::Fp2;
-use noir_bn254_pairing::g2::{LineEvaluation, LineScheduleSp1Raw};
+use noir_bn254_pairing::g2::{LineEvaluation, LineScheduleRaw};
 use noir_bn254_pairing::BigNum;
 
 fn fp_from_limbs(l0: u128, l1: u128, l2: u128) -> Fp {
@@ -11,8 +11,8 @@ fn fp2_from_limbs(a0: [u128; 3], a1: [u128; 3]) -> Fp2 {
     Fp2 { c0: fp_from_limbs(a0[0], a0[1], a0[2]), c1: fp_from_limbs(a1[0], a1[1], a1[2]) }
 }
 
-pub fn sp1_delta_lines() -> LineScheduleSp1Raw {
-    LineScheduleSp1Raw {
+pub fn sp1_delta_lines() -> LineScheduleRaw {
+    LineScheduleRaw {
         initial_double:         LineEvaluation {
             r0: fp2_from_limbs([0xb5f8944c9408933efc5edbed21bb0a, 0xf69739e0724f21369e387b01f9ad0c, 0x2e70], [0xd1792c83b81f6ce74a4a61e42a8b51, 0x14c3dc359b37eae4352f3829c8fb73, 0x2d43]),
             r1: fp2_from_limbs([0x59698d4d5287d679192478d8155c7a, 0x370733b21f320e572fbda775cbc3b9, 0x2949], [0x35262d675742d093c3938f33137c19, 0x844f93d7c987eb6abee332dc427dfb, 0x1d1]),
@@ -992,8 +992,8 @@ pub fn sp1_delta_lines() -> LineScheduleSp1Raw {
     }
 }
 
-pub fn sp1_gamma_lines() -> LineScheduleSp1Raw {
-    LineScheduleSp1Raw {
+pub fn sp1_gamma_lines() -> LineScheduleRaw {
+    LineScheduleRaw {
         initial_double:         LineEvaluation {
             r0: fp2_from_limbs([0xa3ced21887a6f699cd9802cdf4fb54, 0xbd4bb718dbd69556e3011b96811fc7, 0x2590], [0x966266e1671de6ab59b5b9a2452eb6, 0x13a0b0bfe0ebd93d335ad218672b78, 0x120d]),
             r1: fp2_from_limbs([0x2acf7ddb7ad74c028c1a0bd146a17d, 0x437ba87bf892de86475ec2155dd6bf, 0x2f6a], [0xf3267310f51196b7463fd620b3b35a, 0xc4dd8bf1d0a89f2a486ff97fe6ba7e, 0xc2f]),
