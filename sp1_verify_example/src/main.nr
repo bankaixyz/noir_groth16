@@ -23,7 +23,7 @@ pub fn main(
     b_lines_raw: LineScheduleRaw,
     b_line_witness: G2LineWitness,
     mul_034_witnesses: [Mul034Witness; 67],
-) -> pub [Field; 2] {
+) -> pub [Field; 3] {
     let c_fp12 = fp12_from_coeffs(c);
     let w_fp12 = fp12_from_coeffs(w);
     let verified = verify_optimized(
@@ -46,7 +46,9 @@ pub fn main(
         mul_034_witnesses,
     );
     assert(verified);
-    sp1_public_inputs(vkey, public_values)
+    // Question: do we need this seed, and does it need to be public?
+    let public_inputs = sp1_public_inputs(vkey, public_values);
+    [public_inputs[0], public_inputs[1], rho_seed]
 }
 
 fn fp2_from_limbs(c0: [u128; 3], c1: [u128; 3]) -> Fp2 {
