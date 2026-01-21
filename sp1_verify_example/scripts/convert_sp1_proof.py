@@ -185,6 +185,11 @@ def main():
             print(f'  ["{row[0]}", "{row[1]}", "{row[2]}"],')
         print("]")
 
+        if "mul_034_witnesses" in witness:
+            print("")
+            print("# Witnessed mul_034_by_034 products")
+            print_array("mul_034_witnesses", witness["mul_034_witnesses"], toml_mul_034_witness)
+
         if "lines" in witness:
             lines = witness["lines"]
             print("")
@@ -227,11 +232,6 @@ def main():
             print(f"final_add_witness = {toml_add_witness(b_witness['final_add_witness'])}")
             print(f"final_add_output = {toml_g2_proj(b_witness['final_add_output'])}")
             print(f"final_line_witness = {toml_line_compute_witness(b_witness['final_line_witness'])}")
-
-        if "mul_034_witnesses" in witness:
-            print("")
-            print("# Witnessed mul_034_by_034 products")
-            print_array("mul_034_witnesses", witness["mul_034_witnesses"], toml_mul_034_witness)
 
 
 if __name__ == "__main__":
