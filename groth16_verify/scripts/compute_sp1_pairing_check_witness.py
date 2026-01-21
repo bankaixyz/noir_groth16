@@ -492,6 +492,37 @@ def mul_034_by_034(d0: Fp2, d3: Fp2, d4: Fp2, c0: Fp2, c3: Fp2, c4: Fp2) -> List
 
 
 @dataclass(frozen=True)
+class Mul034Witness:
+    x0: Fp2
+    x3: Fp2
+    x4: Fp2
+    x04: Fp2
+    x03: Fp2
+    x34: Fp2
+
+
+def mul_034_by_034_with_witness(
+    d0: Fp2,
+    d3: Fp2,
+    d4: Fp2,
+    c0: Fp2,
+    c3: Fp2,
+    c4: Fp2,
+) -> Tuple[List[Fp2], Mul034Witness]:
+    x0 = c0.mul(d0)
+    x3 = c3.mul(d3)
+    x4 = c4.mul(d4)
+
+    x04 = c0.add(c4).mul(d0.add(d4)).sub(x0).sub(x4)
+    x03 = c0.add(c3).mul(d0.add(d3)).sub(x0).sub(x3)
+    x34 = c3.add(c4).mul(d3.add(d4)).sub(x3).sub(x4)
+
+    z00 = x4.mul_by_non_residue().add(x0)
+    witness = Mul034Witness(x0=x0, x3=x3, x4=x4, x04=x04, x03=x03, x34=x34)
+    return [z00, x3, x34, x03, x04], witness
+
+
+@dataclass(frozen=True)
 class G1Affine:
     x: int
     y: int
@@ -1595,24 +1626,6 @@ def fp12_sample_hex(z: Fp12, count: int = 2) -> List[str]:
     return [hex(c) for c in coeffs[:count]]
 
 
-def derive_rho_sp1_from_limbs(input0: int, input1: int, limb_sets: List[Tuple[int, int, int]]) -> int:
-    data = bytearray(448)
-    offset = 0
-
-    data[offset:offset + 32] = input0.to_bytes(32, "little")
-    offset += 32
-    data[offset:offset + 32] = input1.to_bytes(32, "little")
-    offset += 32
-
-    for limbs in limb_sets:
-        for limb in limbs:
-            data[offset:offset + 16] = limb.to_bytes(16, "little")
-            offset += 16
-
-    digest = hashlib.sha256(data).digest()
-    return int.from_bytes(digest, "big") % P
-
-
 def miller_loop_with_lines_sp1_eval(
     eval_b: "LineScheduleRaw",
     eval_delta: "LineScheduleRaw",
@@ -1675,6 +1688,55 @@ def miller_loop_with_lines_sp1_eval(
         result = result.mul_by_01234(prod_lines)
 
     return result
+
+
+def collect_mul_034_witnesses_sp1_eval(
+    eval_b: "LineScheduleRaw",
+    eval_delta: "LineScheduleRaw",
+    eval_gamma: "LineScheduleRaw",
+) -> List[Mul034Witness]:
+    schedules = [eval_b, eval_delta, eval_gamma]
+    witnesses: List[Mul034Witness] = []
+
+    line0 = schedules[0].initial_double
+    line1 = schedules[1].initial_double
+    _, wit = mul_034_by_034_with_witness(
+        line1.r0,
+        line1.r1,
+        line1.r2,
+        line0.r0,
+        line0.r1,
+        line0.r2,
+    )
+    witnesses.append(wit)
+
+    for k in range(3):
+        l2 = schedules[k].pre_loop_line
+        l1 = schedules[k].pre_loop_add
+        _, wit = mul_034_by_034_with_witness(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2)
+        witnesses.append(wit)
+
+    digits = loop_counter()
+    for idx in range(63):
+        digit = digits[62 - idx]
+        for k in range(3):
+            l1 = schedules[k].loop_doubles[idx]
+            if digit == 1:
+                l2 = schedules[k].loop_adds_pos[idx]
+                _, wit = mul_034_by_034_with_witness(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2)
+                witnesses.append(wit)
+            elif digit == -1:
+                l2 = schedules[k].loop_adds_neg[idx]
+                _, wit = mul_034_by_034_with_witness(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2)
+                witnesses.append(wit)
+
+    for k in range(3):
+        l2 = schedules[k].final_add
+        l1 = schedules[k].final_line
+        _, wit = mul_034_by_034_with_witness(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2)
+        witnesses.append(wit)
+
+    return witnesses
 
 
 def gt_pow(x: Fp12, exponent: int) -> Fp12:
@@ -1918,6 +1980,17 @@ def line_witness_to_payload(w: G2LineWitness) -> dict:
     }
 
 
+def mul_034_witness_to_payload(w: Mul034Witness) -> dict:
+    return {
+        "x0": fp2_to_limb_list(w.x0),
+        "x3": fp2_to_limb_list(w.x3),
+        "x4": fp2_to_limb_list(w.x4),
+        "x04": fp2_to_limb_list(w.x04),
+        "x03": fp2_to_limb_list(w.x03),
+        "x34": fp2_to_limb_list(w.x34),
+    }
+
+
 def combine_eval_schedules(eval_b: LineScheduleRaw, eval_delta: LineScheduleRaw, eval_gamma: LineScheduleRaw) -> dict:
     return {
         "initial_doubles": [
@@ -2098,6 +2171,9 @@ def main() -> None:
         delta_eval = evaluate_schedule_at_p(delta_raw, c)
         gamma_eval = evaluate_schedule_at_p(gamma_raw, l)
         lines_payload = combine_eval_schedules(b_eval, delta_eval, gamma_eval)
+        mul_witnesses = collect_mul_034_witnesses_sp1_eval(b_eval, delta_eval, gamma_eval)
+        if len(mul_witnesses) != 67:
+            raise SystemExit(f"unexpected mul_034 witness count: {len(mul_witnesses)}")
 
         if not args.no_validate:
             f = miller_loop([a, c, compute_linear_combination(input0, input1)], [b, SP1_DELTA_NEG, SP1_GAMMA_NEG])
@@ -2115,6 +2191,7 @@ def main() -> None:
             "lines": lines_payload,
             "b_lines_raw": schedule_raw_to_payload(b_raw),
             "b_line_witness": line_witness_to_payload(b_witness),
+            "mul_034_witnesses": [mul_034_witness_to_payload(w) for w in mul_witnesses],
         }
 
         if args.format == "json":

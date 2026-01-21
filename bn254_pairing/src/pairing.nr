@@ -1,4 +1,4 @@
-use crate::fp12::{Fp12, fp12_one, mul_034_by_034};
+use crate::fp12::{Fp12, Mul034Witness, fp12_one, mul_034_by_034, mul_034_by_034_witnessed};
 use crate::fp::{Fp, fp_one, fp_two, fp_three, fp_zero};
 use crate::fp2::{Fp2, b_twist};
 use crate::fp6::Fp6;
@@ -511,11 +511,15 @@ pub fn miller_loop<let N: u32>(p_list: [G1Affine; N], q_list: [G2Affine; N]) -> 
 fn miller_loop_div_c_with_lines(
     p_list: [G1Affine; 3],
     lines: LineSchedule,
+    mul_034_witnesses: [Mul034Witness; 67],
+    rho: Fp,
     c: Fp12,
     c_inv: Fp12,
-) -> Fp12 {
+) -> (Fp12, bool) {
     let _ = p_list;
     let mut result = fp12_one();
+    let mut ok = true;
+    let mut wit_idx: u32 = 0;
 
     let line0 = lines.initial_doubles[0];
     result.c0.b0 = line0.r0;
@@ -523,14 +527,18 @@ fn miller_loop_div_c_with_lines(
     result.c1.b1 = line0.r2;
 
     let line1 = lines.initial_doubles[1];
-    let prod_lines = mul_034_by_034(
+    let (prod_lines, prod_ok) = mul_034_by_034_witnessed(
         line1.r0,
         line1.r1,
         line1.r2,
         result.c0.b0,
         result.c1.b0,
         result.c1.b1,
+        mul_034_witnesses[wit_idx],
+        rho,
     );
+    ok = ok & prod_ok;
+    wit_idx = wit_idx + 1;
     result.c0.b0 = prod_lines[0];
     result.c0.b1 = prod_lines[1];
     result.c0.b2 = prod_lines[2];
@@ -547,7 +555,18 @@ fn miller_loop_div_c_with_lines(
     for k in 0..3 {
         let l2 = lines.pre_loop_lines[k];
         let l1 = lines.pre_loop_adds[k];
-        let prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2);
+        let (prod_lines, prod_ok) = mul_034_by_034_witnessed(
+            l1.r0,
+            l1.r1,
+            l1.r2,
+            l2.r0,
+            l2.r1,
+            l2.r2,
+            mul_034_witnesses[wit_idx],
+            rho,
+        );
+        ok = ok & prod_ok;
+        wit_idx = wit_idx + 1;
         result = result.mul_by_01234(prod_lines);
     }
 
@@ -566,11 +585,33 @@ fn miller_loop_div_c_with_lines(
             let l1 = lines.loop_doubles[idx][k];
             if digit == 1i8 {
                 let l2 = lines.loop_adds_pos[idx][k];
-                let prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2);
+                let (prod_lines, prod_ok) = mul_034_by_034_witnessed(
+                    l1.r0,
+                    l1.r1,
+                    l1.r2,
+                    l2.r0,
+                    l2.r1,
+                    l2.r2,
+                    mul_034_witnesses[wit_idx],
+                    rho,
+                );
+                ok = ok & prod_ok;
+                wit_idx = wit_idx + 1;
                 result = result.mul_by_01234(prod_lines);
             } else if digit == -1i8 {
                 let l2 = lines.loop_adds_neg[idx][k];
-                let prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2);
+                let (prod_lines, prod_ok) = mul_034_by_034_witnessed(
+                    l1.r0,
+                    l1.r1,
+                    l1.r2,
+                    l2.r0,
+                    l2.r1,
+                    l2.r2,
+                    mul_034_witnesses[wit_idx],
+                    rho,
+                );
+                ok = ok & prod_ok;
+                wit_idx = wit_idx + 1;
                 result = result.mul_by_01234(prod_lines);
             } else {
                 result = result.mul_by_034(l1.r0, l1.r1, l1.r2);
@@ -587,11 +628,23 @@ fn miller_loop_div_c_with_lines(
     for k in 0..3 {
         let l2 = lines.final_adds[k];
         let l1 = lines.final_lines[k];
-        let prod_lines = mul_034_by_034(l1.r0, l1.r1, l1.r2, l2.r0, l2.r1, l2.r2);
+        let (prod_lines, prod_ok) = mul_034_by_034_witnessed(
+            l1.r0,
+            l1.r1,
+            l1.r2,
+            l2.r0,
+            l2.r1,
+            l2.r2,
+            mul_034_witnesses[wit_idx],
+            rho,
+        );
+        ok = ok & prod_ok;
+        wit_idx = wit_idx + 1;
         result = result.mul_by_01234(prod_lines);
     }
 
-    result
+    ok = ok & (wit_idx == 67);
+    (result, ok)
 }
 
 
@@ -687,6 +740,7 @@ pub fn pairing_check_optimized(
     lines: LineSchedule,
     b_lines_raw: LineScheduleRaw,
     b_line_witness: G2LineWitness,
+    mul_034_witnesses: [Mul034Witness; 67],
     rho: Fp,
     c: Fp12,
     w: Fp12,
@@ -697,7 +751,7 @@ pub fn pairing_check_optimized(
     let lines_ok = b_lines_ok & delta_ok & gamma_ok;
 
     let c_inv = c.inverse();
-    let f_div_c = miller_loop_div_c_with_lines(p_list, lines, c, c_inv);
+    let (f_div_c, mul_ok) = miller_loop_div_c_with_lines(p_list, lines, mul_034_witnesses, rho, c, c_inv);
     let f_t = f_div_c.mul(t_preimage);
 
     let w_in_fp6 = fp6_is_zero(w.c1);
@@ -706,5 +760,5 @@ pub fn pairing_check_optimized(
     acc = acc.mul(c.frobenius_square());
     acc = acc.mul(c_inv.frobenius_cube());
 
-    lines_ok & w_in_fp6 & acc.is_one()
+    lines_ok & mul_ok & w_in_fp6 & acc.is_one()
 }

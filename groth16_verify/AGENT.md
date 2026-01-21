@@ -6,10 +6,10 @@ This package provides a Groth16 verifier over BN254 built on `noir_bn254_pairing
 
 - `src/verify.nr`
   - `verify::<N, L>(vk, proof, public_inputs) -> bool`
-  - `verify_optimized(vk, proof, public_inputs, msm2_w3_table, t_preimage, delta_lines, gamma_lines, lines, b_lines_raw, b_line_witness, rho, c, w) -> bool`
+- `verify_optimized(vk, proof, public_inputs, msm2_w3_table, t_preimage, delta_lines, gamma_lines, lines, b_lines_raw, b_line_witness, mul_034_witnesses, rho, c, w) -> bool`
 - `src/sp1.nr`
   - `verify::<N>(vkey, public_values, proof) -> bool`
-  - `verify_optimized::<N>(vkey, public_values, a_x, a_y, b_x_c0, b_x_c1, b_y_c0, b_y_c1, c_x, c_y, c, w, lines, b_lines_raw, b_line_witness) -> bool`
+- `verify_optimized::<N>(vkey, public_values, rho_seed, a_x, a_y, b_x_c0, b_x_c1, b_y_c0, b_y_c1, c_x, c_y, c, w, lines, b_lines_raw, b_line_witness, mul_034_witnesses) -> bool`
   - `sp1_public_inputs(vkey, public_values) -> [Field; 2]`
 - `src/types.nr`
   - `Proof { a, b, c }`

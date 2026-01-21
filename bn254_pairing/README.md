@@ -17,7 +17,7 @@ Core pairing entrypoints:
 
 - `pairing(p: G1Affine, q: G2Affine) -> Fp12`
 - `pairing_multi(p: [G1Affine; N], q: [G2Affine; N]) -> Fp12`
-- `pairing_check_optimized(p_list: [G1Affine; 3], q_list: [G2Affine; 3], t_preimage, delta_lines, gamma_lines, lines, b_lines_raw, b_line_witness, rho, c, w) -> bool`
+- `pairing_check_optimized(p_list: [G1Affine; 3], q_list: [G2Affine; 3], t_preimage, delta_lines, gamma_lines, lines, b_lines_raw, b_line_witness, mul_034_witnesses, rho, c, w) -> bool`
 
 Only these entrypoints are intended for external use.
 
@@ -48,6 +48,8 @@ The implementation uses several circuit-friendly optimizations:
   costs and keep line evaluations cheap.
 - **Pre-evaluated line schedule**: `pairing_check_optimized` consumes witnessed line
   coefficients and validates them, skipping in-circuit G2 arithmetic for the Miller loop.
+- **Witnessed sparse products**: `mul_034_by_034` is verified via compressed checks
+  to avoid recomputing intermediate Fp2 products in-circuit.
 - **Preimage pairing check**: uses a preimage `t_preimage` and witnesses `(c, w)` to
   reduce the final exponentiation to a single `is_one` check.
 - **Frobenius shortcuts**: final exponentiation uses `frobenius`, `frobenius_square`,

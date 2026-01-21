@@ -75,6 +75,19 @@ def toml_line_compute_witness(w) -> str:
     return f"{{ t2 = {toml_fp2(w[0])} }}"
 
 
+def toml_mul_034_witness(w) -> str:
+    return (
+        "{ "
+        f"x0 = {toml_fp2(w['x0'])}, "
+        f"x3 = {toml_fp2(w['x3'])}, "
+        f"x4 = {toml_fp2(w['x4'])}, "
+        f"x04 = {toml_fp2(w['x04'])}, "
+        f"x03 = {toml_fp2(w['x03'])}, "
+        f"x34 = {toml_fp2(w['x34'])}"
+        " }"
+    )
+
+
 def print_array(name: str, values, formatter) -> None:
     print(f"{name} = [")
     for value in values:
@@ -93,6 +106,7 @@ def main():
     parser = argparse.ArgumentParser(description="Convert SP1 proof JSON to Noir inputs")
     parser.add_argument("input_json", help="SP1 proof JSON (proof/publicValues/vkey)")
     parser.add_argument("--no-witness", action="store_true", help="Skip pairing-check witness generation")
+    parser.add_argument("--rho-seed", default="0", help="Public rho seed (decimal or hex)")
     args = parser.parse_args()
 
     with open(args.input_json, "r", encoding="utf-8") as f:
@@ -153,6 +167,10 @@ def main():
     print("")
     print("# SP1 public values (32 bytes)")
     print(f"public_values = {public_values_bytes}")
+    rho_seed = int(args.rho_seed, 0)
+    print("")
+    print("# Public rho seed used for compressed checks")
+    print(f'rho_seed = "{rho_seed}"')
 
     if not args.no_witness:
         witness = load_pairing_check_witness(args.input_json)
@@ -209,6 +227,11 @@ def main():
             print(f"final_add_witness = {toml_add_witness(b_witness['final_add_witness'])}")
             print(f"final_add_output = {toml_g2_proj(b_witness['final_add_output'])}")
             print(f"final_line_witness = {toml_line_compute_witness(b_witness['final_line_witness'])}")
+
+        if "mul_034_witnesses" in witness:
+            print("")
+            print("# Witnessed mul_034_by_034 products")
+            print_array("mul_034_witnesses", witness["mul_034_witnesses"], toml_mul_034_witness)
 
 
 if __name__ == "__main__":

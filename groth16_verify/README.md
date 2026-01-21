@@ -19,12 +19,12 @@ and an SP1 wrapper for two public inputs.
 Generic verifier:
 
 - `verify(vk, proof, public_inputs) -> bool`
-- `verify_optimized(vk, proof, public_inputs, msm2_w3_table, t_preimage, delta_lines, gamma_lines, lines, b_lines_raw, b_line_witness, rho, c, w) -> bool`
+- `verify_optimized(vk, proof, public_inputs, msm2_w3_table, t_preimage, delta_lines, gamma_lines, lines, b_lines_raw, b_line_witness, mul_034_witnesses, rho, c, w) -> bool`
 
 SP1 verifier (two inputs):
 
 - `sp1::verify(vkey, public_values, proof) -> bool`
-- `sp1::verify_optimized(vkey, public_values, a_x, a_y, b_x_c0, b_x_c1, b_y_c0, b_y_c1, c_x, c_y, c, w, lines, b_lines_raw, b_line_witness) -> bool`
+- `sp1::verify_optimized(vkey, public_values, rho_seed, a_x, a_y, b_x_c0, b_x_c1, b_y_c0, b_y_c1, c_x, c_y, c, w, lines, b_lines_raw, b_line_witness, mul_034_witnesses) -> bool`
 
 Core types:
 
@@ -46,8 +46,8 @@ SP1 exposes two public inputs:
 - `input1 = sha256(public_values)` masked to 253 bits
 
 `sp1::verify` computes these inputs and calls the generic verifier.
-`sp1::verify_optimized` additionally derives `rho`, validates the line schedule,
-and uses the preimage pairing check.
+`sp1::verify_optimized` additionally derives `rho` (Poseidon2 with a public seed),
+validates the line schedule, and uses the preimage pairing check.
 
 ## Optimization notes
 

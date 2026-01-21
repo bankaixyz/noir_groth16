@@ -1,3 +1,4 @@
+use crate::fp::Fp;
 use crate::fp2::{Fp2, fp2_one, fp2_zero};
 use crate::fp6::{Fp6, fp6_one, fp6_zero};
 
@@ -6,6 +7,16 @@ use crate::fp6::{Fp6, fp6_one, fp6_zero};
 pub struct Fp12 {
     pub c0: Fp6,
     pub c1: Fp6,
+}
+
+/// Witness values for sparse line multiplication (coeffs 0,3,4).
+pub struct Mul034Witness {
+    pub x0: Fp2,
+    pub x3: Fp2,
+    pub x4: Fp2,
+    pub x04: Fp2,
+    pub x03: Fp2,
+    pub x34: Fp2,
 }
 
 pub fn fp12_zero() -> Fp12 {
@@ -253,4 +264,39 @@ pub fn mul_034_by_034(d0: Fp2, d3: Fp2, d4: Fp2, c0: Fp2, c3: Fp2, c4: Fp2) -> [
 
     let z00 = x4.mul_by_non_residue().add(x0);
     [z00, x3, x34, x03, x04]
+}
+
+fn fp2_mul_compressed_check(a: Fp2, b: Fp2, c: Fp2, rho: Fp) -> bool {
+    let left = (a.c0 + rho * a.c1) * (b.c0 + rho * b.c1);
+    let right = c.c0 + rho * c.c1;
+    left == right
+}
+
+/// Multiply sparse line evaluations using witnessed Fp2 products.
+pub fn mul_034_by_034_witnessed(
+    d0: Fp2,
+    d3: Fp2,
+    d4: Fp2,
+    c0: Fp2,
+    c3: Fp2,
+    c4: Fp2,
+    witness: Mul034Witness,
+    rho: Fp,
+) -> ([Fp2; 5], bool) {
+    let mut ok = true;
+    ok = ok & fp2_mul_compressed_check(c0, d0, witness.x0, rho);
+    ok = ok & fp2_mul_compressed_check(c3, d3, witness.x3, rho);
+    ok = ok & fp2_mul_compressed_check(c4, d4, witness.x4, rho);
+
+    let rhs_04 = witness.x0.add(witness.x4).add(witness.x04);
+    ok = ok & fp2_mul_compressed_check(c0.add(c4), d0.add(d4), rhs_04, rho);
+
+    let rhs_03 = witness.x0.add(witness.x3).add(witness.x03);
+    ok = ok & fp2_mul_compressed_check(c0.add(c3), d0.add(d3), rhs_03, rho);
+
+    let rhs_34 = witness.x3.add(witness.x4).add(witness.x34);
+    ok = ok & fp2_mul_compressed_check(c3.add(c4), d3.add(d4), rhs_34, rho);
+
+    let z00 = witness.x4.mul_by_non_residue().add(witness.x0);
+    ([z00, witness.x3, witness.x34, witness.x03, witness.x04], ok)
 }

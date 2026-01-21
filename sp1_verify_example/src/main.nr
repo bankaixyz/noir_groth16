@@ -1,7 +1,7 @@
 use noir_bn254_pairing::fp::fp_from_limbs_checked;
 use noir_bn254_pairing::fp2::Fp2;
 use noir_bn254_pairing::fp6::Fp6;
-use noir_bn254_pairing::fp12::Fp12;
+use noir_bn254_pairing::fp12::{Fp12, Mul034Witness};
 use noir_bn254_pairing::g2::{G2LineWitness, LineSchedule, LineScheduleRaw};
 use noir_groth16_verify::sp1::{sp1_public_inputs, verify_optimized};
 
@@ -16,17 +16,20 @@ pub fn main(
     c_y: [u128; 3],
     vkey: Field,
     public_values: [u8; 32],
+    pub rho_seed: Field,
     c: [[u128; 3]; 12],
     w: [[u128; 3]; 12],
     lines: LineSchedule,
     b_lines_raw: LineScheduleRaw,
     b_line_witness: G2LineWitness,
+    mul_034_witnesses: [Mul034Witness; 67],
 ) -> pub [Field; 2] {
     let c_fp12 = fp12_from_coeffs(c);
     let w_fp12 = fp12_from_coeffs(w);
     let verified = verify_optimized(
         vkey,
         public_values,
+        rho_seed,
         a_x,
         a_y,
         b_x_c0,
@@ -40,6 +43,7 @@ pub fn main(
         lines,
         b_lines_raw,
         b_line_witness,
+        mul_034_witnesses,
     );
     assert(verified);
     sp1_public_inputs(vkey, public_values)

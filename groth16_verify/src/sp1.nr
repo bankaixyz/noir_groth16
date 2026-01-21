@@ -4,7 +4,7 @@ use crate::types::Proof;
 use crate::verify::{verify as verify_groth16, verify_optimized as verify_groth16_optimized};
 use noir_bn254_pairing::fp::{Fp, fp_from_limbs_checked};
 use noir_bn254_pairing::fp2::Fp2;
-use noir_bn254_pairing::fp12::Fp12;
+use noir_bn254_pairing::fp12::{Fp12, Mul034Witness};
 use noir_bn254_pairing::g1::G1Affine;
 use noir_bn254_pairing::g2::{G2Affine, G2LineWitness, LineSchedule, LineScheduleRaw};
 use noir_bn254_pairing::BigNum;
@@ -76,6 +76,7 @@ fn limb_to_field(value: u128) -> Field {
 }
 
 fn derive_rho_sp1<let N: u32>(
+    rho_seed: Field,
     vkey: Field,
     public_values: [u8; N],
     a_x: [u128; 3],
@@ -88,12 +89,13 @@ fn derive_rho_sp1<let N: u32>(
     c_y: [u128; 3],
 ) -> Fp {
     let public_inputs = sp1_public_inputs(vkey, public_values);
-    let mut inputs: [Field; 26] = [0; 26];
-    inputs[0] = public_inputs[0];
-    inputs[1] = public_inputs[1];
+    let mut inputs: [Field; 27] = [0; 27];
+    inputs[0] = rho_seed;
+    inputs[1] = public_inputs[0];
+    inputs[2] = public_inputs[1];
 
     let limb_sets = [a_x, a_y, b_x_c0, b_x_c1, b_y_c0, b_y_c1, c_x, c_y];
-    let mut idx: u32 = 2;
+    let mut idx: u32 = 3;
     for s in 0..8 {
         let limbs = limb_sets[s];
         for l in 0..3 {
@@ -139,6 +141,7 @@ pub fn verify<let N: u32>(
 pub fn verify_optimized<let N: u32>(
     vkey: Field,
     public_values: [u8; N],
+    rho_seed: Field,
     a_x: [u128; 3],
     a_y: [u128; 3],
     b_x_c0: [u128; 3],
@@ -152,6 +155,7 @@ pub fn verify_optimized<let N: u32>(
     lines: LineSchedule,
     b_lines_raw: LineScheduleRaw,
     b_line_witness: G2LineWitness,
+    mul_034_witnesses: [Mul034Witness; 67],
 ) -> bool {
     let proof = Proof {
         a: G1Affine { x: fp_from_limbs_checked(a_x), y: fp_from_limbs_checked(a_y) },
@@ -163,6 +167,7 @@ pub fn verify_optimized<let N: u32>(
     };
     let public_inputs = sp1_public_inputs(vkey, public_values);
     let rho = derive_rho_sp1(
+        rho_seed,
         vkey,
         public_values,
         a_x,
@@ -190,6 +195,7 @@ pub fn verify_optimized<let N: u32>(
         lines,
         b_lines_raw,
         b_line_witness,
+        mul_034_witnesses,
         rho,
         c,
         w,

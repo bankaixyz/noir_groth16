@@ -1,7 +1,7 @@
 use crate::types::{Proof, VerifyingKey};
 use noir_bn254_pairing::fp::{Fp, fp_one};
 use noir_bn254_pairing::fp2::Fp2;
-use noir_bn254_pairing::fp12::Fp12;
+use noir_bn254_pairing::fp12::{Fp12, Mul034Witness};
 use noir_bn254_pairing::g1::{
     G1Affine,
     G1Jac,
@@ -200,6 +200,7 @@ pub fn verify_optimized(
     lines: LineSchedule,
     b_lines_raw: LineScheduleRaw,
     b_line_witness: G2LineWitness,
+    mul_034_witnesses: [Mul034Witness; 67],
     rho: Fp,
     c: Fp12,
     w: Fp12,
@@ -225,6 +226,7 @@ pub fn verify_optimized(
         lines,
         b_lines_raw,
         b_line_witness,
+        mul_034_witnesses,
         rho,
         c,
         w,
