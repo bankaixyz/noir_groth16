@@ -3,7 +3,7 @@ use noir_bn254_pairing::fp2::Fp2;
 use noir_bn254_pairing::fp6::Fp6;
 use noir_bn254_pairing::fp12::Fp12;
 use noir_bn254_pairing::g2::{G2LineWitness, LineSchedule, LineScheduleRaw};
-use noir_groth16_verify::sp1::{sp1_public_inputs, verify_optimized};
+use noir_groth16_verify::sp1::verify_optimized;
 
 pub fn main(
     a_x: [u128; 3],
@@ -21,7 +21,7 @@ pub fn main(
     lines: LineSchedule,
     b_lines_raw: LineScheduleRaw,
     b_line_witness: G2LineWitness,
-) -> pub [Field; 2] {
+) -> pub ([u8; 32], Field) {
     let c_fp12 = fp12_from_coeffs(c);
     let w_fp12 = fp12_from_coeffs(w);
     let verified = verify_optimized(
@@ -42,7 +42,9 @@ pub fn main(
         b_line_witness,
     );
     assert(verified);
-    sp1_public_inputs(vkey, public_values)
+
+    // Todo: add rho_seed to the public inputs
+    (public_values, vkey)
 }
 
 fn fp2_from_limbs(c0: [u128; 3], c1: [u128; 3]) -> Fp2 {

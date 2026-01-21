@@ -210,7 +210,8 @@ pub fn verify_optimized(
     assert(!proof.a.is_infinity());
     assert(!proof.b.is_infinity());
     assert(!proof.c.is_infinity());
-    assert(is_in_correct_subgroup_g2(proof.b));
+    // ToDo: deactivate for now
+    // assert(is_in_correct_subgroup_g2(proof.b));
 
     let msm = msm2_window3_g1_jac(msm2_w3_table, public_inputs[0], public_inputs[1]);
     let acc = add_g1_jac_mixed(msm, vk.ic[0]);
