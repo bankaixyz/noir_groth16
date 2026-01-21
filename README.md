@@ -17,8 +17,7 @@ This repo contains two Noir libraries:
   BN254 (Fuentes-Castaneda, Knapp, Rodriguez-Henriquez 2011).
 - **Groth16 verification**: compute L = IC_0 + sum_i IC_{i+1} * input_i and check
   e(A, B) * e(C, -delta) * e(L, -gamma) = e(alpha, beta).
-- **Proof validation**: verifier enforces on-curve checks, rejects infinity points,
-  and checks G2 subgroup membership for proof points.
+- **Proof validation**: verifier enforces on-curve checks and rejects infinity points.
 - **Optimized verification**: 2-scalar MSM with a 3-bit joint window (Straus/Shamir),
   pre-evaluated line schedules, and a pairing preimage check.
 
@@ -105,6 +104,44 @@ fn multi_pairing(p: [G1Affine; 2], q: [G2Affine; 2]) -> Field {
 }
 ```
 
+Optimized pairing check (three fixed pairs with line schedules):
+
+```noir
+use noir_bn254_pairing::fp::Fp;
+use noir_bn254_pairing::fp12::Fp12;
+use noir_bn254_pairing::g1::G1Affine;
+use noir_bn254_pairing::g2::{G2Affine, G2LineWitness, LineSchedule, LineScheduleRaw};
+use noir_bn254_pairing::pairing_check_optimized;
+
+fn pairing_check_opt(
+    p_list: [G1Affine; 3],
+    q_list: [G2Affine; 3],
+    t_preimage: Fp12,
+    delta_lines: LineScheduleRaw,
+    gamma_lines: LineScheduleRaw,
+    lines: LineSchedule,
+    b_lines_raw: LineScheduleRaw,
+    b_line_witness: G2LineWitness,
+    rho: Fp,
+    c: Fp12,
+    w: Fp12,
+) -> bool {
+    pairing_check_optimized(
+        p_list,
+        q_list,
+        t_preimage,
+        delta_lines,
+        gamma_lines,
+        lines,
+        b_lines_raw,
+        b_line_witness,
+        rho,
+        c,
+        w,
+    )
+}
+```
+
 ## Groth16 verification usage
 
 Generic verifier:
@@ -124,6 +161,49 @@ fn check<const N: u32, const L: u32>(
 
 For the optimized verifier, call `verify_optimized` with a joint-window MSM table,
 preimage data, and a witnessed line schedule (see `sp1_verify_example`).
+
+Optimized verifier (two public inputs):
+
+```noir
+use noir_groth16_verify::verify::verify_optimized;
+use noir_groth16_verify::types::{Proof, VerifyingKey};
+use noir_bn254_pairing::fp::Fp;
+use noir_bn254_pairing::fp12::Fp12;
+use noir_bn254_pairing::g1::G1Affine;
+use noir_bn254_pairing::g2::{G2LineWitness, LineSchedule, LineScheduleRaw};
+
+fn check_opt(
+    vk: VerifyingKey<3>,
+    proof: Proof,
+    public_inputs: [Field; 2],
+    msm2_w3_table: [G1Affine; 64],
+    t_preimage: Fp12,
+    delta_lines: LineScheduleRaw,
+    gamma_lines: LineScheduleRaw,
+    lines: LineSchedule,
+    b_lines_raw: LineScheduleRaw,
+    b_line_witness: G2LineWitness,
+    rho: Fp,
+    c: Fp12,
+    w: Fp12,
+) -> bool {
+    verify_optimized(
+        vk,
+        proof,
+        public_inputs,
+        msm2_w3_table,
+        t_preimage,
+        delta_lines,
+        gamma_lines,
+        lines,
+        b_lines_raw,
+        b_line_witness,
+        rho,
+        c,
+        w,
+    )
+}
+```
 
 SP1 verifier (two public inputs: vkey and hash(public values)):
 
